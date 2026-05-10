@@ -2,9 +2,9 @@ spring:
   application:
     name: circleguard-promotion-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/circleguard_promotion
-    username: admin
-    password: password
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:circleguard_promotion}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -13,12 +13,12 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   neo4j:
-    uri: bolt://localhost:7687
+    uri: bolt://${NEO4J_HOST:localhost}:${NEO4J_PORT:7687}
     authentication:
-      username: neo4j
-      password: password
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:password}
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: promotion-service-group
       auto-offset-reset: earliest
@@ -28,12 +28,22 @@ spring:
         spring.json.trusted.packages: "*"
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 server:
-  port: 8088
+  port: ${SERVER_PORT:8088}
 
 jwt:
-  secret: "my-super-secret-dev-key-32-chars-long-12345678"
-  expiration: 3600000
+  secret: "${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}"
+  expiration: ${JWT_EXPIRATION:3600000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true

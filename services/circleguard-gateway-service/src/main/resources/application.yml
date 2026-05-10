@@ -3,16 +3,26 @@ spring:
     name: circleguard-gateway-service
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 jwt:
-  secret: "my-super-secret-dev-key-32-chars-long-12345678"
-  expiration: 3600000
+  secret: "${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}"
+  expiration: ${JWT_EXPIRATION:3600000}
 
 qr:
-  secret: "my-qr-secret-key-for-dev-1234567890"
-  expiration: 300
+  secret: "${QR_SECRET:my-qr-secret-key-for-dev-1234567890}"
+  expiration: ${QR_EXPIRATION:300}
 
 server:
-  port: 8087
+  port: ${SERVER_PORT:8087}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true

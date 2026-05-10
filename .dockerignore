@@ -1,0 +1,14 @@
+.git
+.gradle
+build
+bin
+out
+*.md
+!README.md
+!CONTAINERIZATION.md
+!AGENTS.md
+.idea
+*.iml
+.DS_Store
+mobile
+uploads
