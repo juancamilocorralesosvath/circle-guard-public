@@ -2,9 +2,9 @@ spring:
   application:
     name: circleguard-promotion-service
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:circleguard_promotion}
-    username: ${DB_USERNAME:admin}
-    password: ${DB_PASSWORD:password}
+    url: jdbc:postgresql://${DB_HOST:postgres-service}:${DB_PORT:5432}/${DB_NAME:circleguard_promotion}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -13,12 +13,12 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   neo4j:
-    uri: bolt://${NEO4J_HOST:localhost}:${NEO4J_PORT:7687}
+    uri: bolt://${NEO4J_HOST:neo4j-service}:${NEO4J_PORT:7687}
     authentication:
-      username: ${NEO4J_USERNAME:neo4j}
-      password: ${NEO4J_PASSWORD:password}
+      username: ${NEO4J_USERNAME}
+      password: ${NEO4J_PASSWORD}
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka-service:9092}
     consumer:
       group-id: promotion-service-group
       auto-offset-reset: earliest
@@ -28,14 +28,14 @@ spring:
         spring.json.trusted.packages: "*"
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:redis-service}
       port: ${REDIS_PORT:6379}
 
 server:
   port: ${SERVER_PORT:8088}
 
 jwt:
-  secret: "${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}"
+  secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:3600000}
 
 management:
@@ -47,3 +47,19 @@ management:
     health:
       probes:
         enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:password}
+  neo4j:
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:password}
+
+jwt:
+  secret: ${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}

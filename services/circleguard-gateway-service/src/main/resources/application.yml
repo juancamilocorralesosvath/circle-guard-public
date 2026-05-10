@@ -3,15 +3,15 @@ spring:
     name: circleguard-gateway-service
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
+      host: ${REDIS_HOST:redis-service}
       port: ${REDIS_PORT:6379}
 
 jwt:
-  secret: "${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}"
+  secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:3600000}
 
 qr:
-  secret: "${QR_SECRET:my-qr-secret-key-for-dev-1234567890}"
+  secret: ${QR_SECRET}
   expiration: ${QR_EXPIRATION:300}
 
 server:
@@ -26,3 +26,15 @@ management:
     health:
       probes:
         enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+jwt:
+  secret: ${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}
+
+qr:
+  secret: ${QR_SECRET:my-qr-secret-key-for-dev-1234567890}

@@ -2,7 +2,7 @@
 FROM eclipse-temurin:21-jdk-jammy AS build
 WORKDIR /app
 COPY . .
-RUN ./gradlew :circleguard-notification-service:bootJar --no-daemon
+RUN ./gradlew :services:circleguard-notification-service:bootJar --no-daemon
 
 # Runtime stage
 FROM eclipse-temurin:21-jre-jammy

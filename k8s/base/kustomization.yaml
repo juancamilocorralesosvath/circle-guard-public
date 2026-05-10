@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - configmaps/circleguard-config.yaml
+  - configmaps/postgres-init-config.yaml
+  - secrets/circleguard-secrets.yaml
+  - postgres/postgres.yaml
+  - neo4j/neo4j.yaml
+  - redis/redis.yaml
+  - kafka/zookeeper.yaml
+  - kafka/kafka.yaml
+  - openldap/openldap.yaml

@@ -71,3 +71,13 @@ The externalized configuration directly maps to Kubernetes concepts:
 1. **ConfigMaps**: Will store non-sensitive configuration like `DB_HOST`, `KAFKA_BOOTSTRAP_SERVERS`, `REDIS_HOST`.
 2. **Secrets**: Will store sensitive credentials like `DB_PASSWORD`, `JWT_SECRET`, `VAULT_SECRET`.
 3. **Probes**: Kubernetes Deployments will point `readinessProbe` and `livenessProbe` to `httpGet` on path `/actuator/health` at the service's port.
+
+## 9. Environment-Specific Secret Policies
+The applications support multiple environments via Spring Profiles.
+
+- **Non-Dev Environments (Staging, Prod, CI):** The base `application.yml` file is used. Insecure secret fallbacks have been completely removed. Therefore, sensitive values (like `JWT_SECRET`, `DB_PASSWORD`) are strictly required. Missing secrets will trigger an immediate JVM crash upon startup (Fail-Fast), guaranteeing no leakage of insecure states.
+- **Dev Environments (Local):** Developers can pass the `SPRING_PROFILES_ACTIVE=dev` environment variable to their container or local run. This triggers the `dev` profile using Spring Boot's multi-document YAML syntax, re-injecting the insecure default placeholders specifically for developer ease of use, without harming production security.
+
+## 10. Dev vs Staging vs Production Behavior
+- **Local Dev:** Run with `-e SPRING_PROFILES_ACTIVE=dev` to safely utilize fallback placeholders (e.g. `password`).
+- **Staging/Prod:** Provide fully populated Kubernetes Secrets. The applications will refuse to start if any secret payload is missing.
