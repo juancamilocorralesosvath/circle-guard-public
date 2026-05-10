@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: circleguard-promotion-service
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: circleguard-promotion-service
+  template:
+    metadata:
+      labels:
+        app: circleguard-promotion-service
+    spec:
+      containers:
+      - name: promotion-service
+        image: circleguard-promotion-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8088
+        envFrom:
+        - configMapRef:
+            name: circleguard-config
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: dev
+        - name: DB_NAME
+          value: circleguard_promotion
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-db-credentials
+              key: DB_USERNAME
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-db-credentials
+              key: DB_PASSWORD
+        - name: NEO4J_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-neo4j-credentials
+              key: NEO4J_USERNAME
+        - name: NEO4J_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-neo4j-credentials
+              key: NEO4J_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-jwt-secret
+              key: JWT_SECRET
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8088
+          initialDelaySeconds: 40
+          periodSeconds: 10
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8088
+          initialDelaySeconds: 90
+          periodSeconds: 20
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8088
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          failureThreshold: 40
+        resources:
+          requests:
+            cpu: 250m
+            memory: 384Mi
+          limits:
+            cpu: "1"
+            memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: circleguard-promotion-service
+spec:
+  ports:
+  - port: 8088
+    targetPort: 8088
+  selector:
+    app: circleguard-promotion-service

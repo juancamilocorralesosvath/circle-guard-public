@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: circleguard-auth-service
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: circleguard-auth-service
+  template:
+    metadata:
+      labels:
+        app: circleguard-auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: circleguard-auth-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8180
+        envFrom:
+        - configMapRef:
+            name: circleguard-config
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: dev
+        - name: DB_NAME
+          value: circleguard_auth
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-db-credentials
+              key: DB_USERNAME
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-db-credentials
+              key: DB_PASSWORD
+        - name: LDAP_USER
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-ldap-credentials
+              key: LDAP_USER
+        - name: LDAP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-ldap-credentials
+              key: LDAP_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-jwt-secret
+              key: JWT_SECRET
+        - name: QR_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: circleguard-qr-secret
+              key: QR_SECRET
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8180
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8180
+          initialDelaySeconds: 60
+          periodSeconds: 20
+          failureThreshold: 5
+        startupProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8180
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 30
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: circleguard-auth-service
+spec:
+  ports:
+  - port: 8180
+    targetPort: 8180
+  selector:
+    app: circleguard-auth-service

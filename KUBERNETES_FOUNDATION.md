@@ -13,6 +13,7 @@ k8s/
 │   ├── neo4j/
 │   ├── kafka/
 │   ├── openldap/
+│   ├── services/
 │   └── kustomization.yaml
 ├── overlays/
 │   ├── dev/
@@ -47,6 +48,20 @@ All middleware dependencies are configured for simplicity, portability, and clus
 - **Kafka / Zookeeper**: Zookeeper Deployment + Kafka StatefulSet with `1Gi` PVC. Configured as `PLAINTEXT://kafka-service:9092`.
 - **OpenLDAP**: Deployment with 1 replica for Auth Service dependencies.
 
+## Microservice Architecture
+All 6 microservices are deployed as stateless `Deployments` with associated `ClusterIP` services:
+- **identity-service**: Port 8083
+- **auth-service**: Port 8180
+- **form-service**: Port 8086
+- **promotion-service**: Port 8088
+- **gateway-service**: Port 8087
+- **notification-service**: Port 8082
+
+### Deployment Characteristics
+- **Probes**: Each service implements `startup`, `readiness`, and `liveness` probes targeting Spring Boot Actuator endpoints.
+- **Resource Limits**: CPU/Memory requests and limits are configured to be "local-cluster friendly" while ensuring stability.
+- **Scaling**: All services default to 1 replica, but are configured for zero-downtime `RollingUpdate` rollouts.
+
 ## Storage Strategy
 We use generic `PersistentVolumeClaims` (PVCs) without explicitly specifying a `storageClassName`. This allows local Kubernetes clusters (like Minikube, Kind, or Docker Desktop) to automatically provision storage using their default StorageClass (usually `standard` or `hostpath`).
 
@@ -57,6 +72,12 @@ All services are mapped via Kubernetes DNS inside the namespace:
 - `redis-service`
 - `kafka-service`
 - `openldap-service`
+- `circleguard-identity-service`
+- `circleguard-auth-service`
+- `circleguard-form-service`
+- `circleguard-promotion-service`
+- `circleguard-gateway-service`
+- `circleguard-notification-service`
 
 ## Operational Commands
 **To deploy the development environment:**
@@ -85,8 +106,6 @@ kubectl describe pod <pod-name> -n circleguard-dev
 - Initial deployment might take several minutes to download large middleware images (e.g. `neo4j:5.26`, `confluentinc/cp-kafka`).
 - Memory pressure on Docker Desktop might cause OOMKills if all middleware boots simultaneously. Allocating at least 6GB to Docker Desktop is recommended.
 
-## Future Microservice Integration Notes
-Microservices should be implemented as `Deployment` objects in Phase 2B. They must:
-- Inject the `circleguard-config` ConfigMap via `envFrom`.
-- Inject the appropriate Secrets via `envFrom` or specific `valueFrom` mappings.
-- Implement readiness probes with `initialDelaySeconds: 15-30` to wait for middleware to stabilize.
+## Deployment Validation
+Detailed runtime validation results for the microservices can be found in [MICROSERVICE_DEPLOYMENT_VALIDATION.md](file:///Users/vania/Desktop/juan/icesi/VIII/ingesoftV/talleres/circle-guard-public/MICROSERVICE_DEPLOYMENT_VALIDATION.md).
+

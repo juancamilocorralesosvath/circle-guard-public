@@ -22,6 +22,39 @@ Check Persistent Volume Claims:
 kubectl get pvc -n circleguard-dev
 ```
 
+## Rollout & Maintenance
+
+**Rollout Status:**
+```bash
+kubectl rollout status deployment/circleguard-auth-service -n circleguard-dev
+```
+
+**Restart a Service (to pick up config/secret changes):**
+```bash
+kubectl rollout restart deployment/circleguard-auth-service -n circleguard-dev
+```
+
+**Scale a Service:**
+```bash
+kubectl scale deployment/circleguard-auth-service --replicas=2 -n circleguard-dev
+```
+
+## Detailed Validation
+
+**Test Inter-Service Connectivity:**
+```bash
+kubectl exec deploy/circleguard-auth-service -n circleguard-dev -- curl -s http://circleguard-identity-service:8083/actuator/health/readiness
+```
+
+**Sweep All Microservices Readiness:**
+```bash
+for svc in circleguard-identity-service:8083 circleguard-auth-service:8180 circleguard-form-service:8086 circleguard-promotion-service:8088 circleguard-gateway-service:8087 circleguard-notification-service:8082; do
+  echo -n "$svc: "
+  kubectl exec deploy/circleguard-auth-service -n circleguard-dev -- curl -s http://$svc/actuator/health/readiness
+  echo
+done
+```
+
 ## Cleanup
 
 To tear down the environment (including all data):
