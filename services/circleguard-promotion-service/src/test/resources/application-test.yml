@@ -6,7 +6,7 @@ spring:
       mode: never
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
   neo4j:
     uri: bolt://localhost:7687
     authentication:
