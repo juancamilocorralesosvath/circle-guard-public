@@ -1,0 +1,17 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+
+auth:
+  api:
+    url: http://localhost:8180
+
+jwt:
+  secret: my-super-secret-dev-key-32-chars-long-12345678
+
+qr:
+  secret: my-qr-secret-key-for-dev-1234567890
+
+logging:
+  level:
+    root: WARN
