@@ -1,16 +1,16 @@
 FROM jenkins/inbound-agent:latest
 USER root
-# Install Docker CLI via Docker's official repository (docker-ce-cli)
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release git \
-  && mkdir -p /etc/apt/keyrings \
-  && curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" \
-    > /etc/apt/sources.list.d/docker.list \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends docker-ce-cli \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/* /etc/apt/keyrings/docker.gpg
+# Install Docker CLI and networking/git tools (dnsutils, iputils-ping, git, curl)
+RUN set -eux; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release; \
+  mkdir -p /etc/apt/keyrings; \
+  curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg; \
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends git dnsutils iputils-ping ca-certificates docker-ce-cli curl; \
+  apt-get clean; \
+  rm -rf /var/lib/apt/lists/* /etc/apt/keyrings/docker.gpg
 # Install kubectl (choose arch at build-time)
 RUN ARCH="$(uname -m)" \
   && if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then KUBECTL_ARCH=arm64; else KUBECTL_ARCH=amd64; fi \
