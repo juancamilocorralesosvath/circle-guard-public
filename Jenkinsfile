@@ -5,7 +5,10 @@ pipeline {
     DOCKER_USER = 'juanc0410'
     SERVICES = 'auth-service identity-service form-service promotion-service gateway-service notification-service'
   }
-  options { ansiColor('xterm') timestamps() }
+  options {
+    ansiColor('xterm')
+    timestamps()
+  }
   stages {
     stage('Checkout') {
       agent { label 'docker-builder' }
