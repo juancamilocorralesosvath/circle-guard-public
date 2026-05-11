@@ -70,3 +70,29 @@ kubectl delete -k k8s/overlays/dev
 
 > [!NOTE]
 > Do not edit the `overlays` unless you want to override specific base values (like removing dev secrets in production). Modify `base` if you are changing fundamental topology.
+
+## Jenkins CI/CD (added)
+
+This repository includes Kubernetes manifests to run a workshop Jenkins instance inside the cluster.
+
+To install Jenkins (workshop) alongside existing resources:
+
+```bash
+kubectl apply -k k8s/overlays/dev
+# Jenkins manifests are included under k8s/base/services/jenkins
+```
+
+Access Jenkins UI using the `jenkins` Service NodePort:
+
+```bash
+kubectl -n jenkins get svc jenkins
+# visit http://<node-ip>:32080
+```
+
+Notes:
+- Jenkins is installed into the `jenkins` namespace and includes a StatefulSet with a PVC for `/var/jenkins_home`.
+- Agents must be scheduled to nodes labeled `docker-builder=true` to enable Docker-outside-of-Docker builds (DooD). Label a node with:
+  ```bash
+  kubectl label node <node-name> docker-builder=true
+  ```
+

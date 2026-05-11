@@ -20,3 +20,10 @@ resources:
   - services/promotion-service.yaml
   - services/gateway-service.yaml
   - services/notification-service.yaml
+  # CI/CD / tooling
+  - services/jenkins/jenkins-namespace.yaml
+  - services/jenkins/jenkins-serviceaccount.yaml
+  - services/jenkins/jenkins-statefulset.yaml
+  - services/jenkins/jenkins-service.yaml
+  - rbac/jenkins-clusterrole.yaml
+  - rbac/jenkins-clusterrolebinding.yaml

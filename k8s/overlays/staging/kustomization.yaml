@@ -6,3 +6,23 @@ namespace: circleguard-staging
 resources:
   - ../../base
   - namespace.yaml
+
+images:
+  - name: circleguard-auth-service
+    newName: docker.io/juanc0410/circleguard-auth-service
+    newTag: latest
+  - name: circleguard-identity-service
+    newName: docker.io/juanc0410/circleguard-identity-service
+    newTag: latest
+  - name: circleguard-form-service
+    newName: docker.io/juanc0410/circleguard-form-service
+    newTag: latest
+  - name: circleguard-promotion-service
+    newName: docker.io/juanc0410/circleguard-promotion-service
+    newTag: latest
+  - name: circleguard-gateway-service
+    newName: docker.io/juanc0410/circleguard-gateway-service
+    newTag: latest
+  - name: circleguard-notification-service
+    newName: docker.io/juanc0410/circleguard-notification-service
+    newTag: latest

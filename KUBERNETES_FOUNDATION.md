@@ -109,3 +109,27 @@ kubectl describe pod <pod-name> -n circleguard-dev
 ## Deployment Validation
 Detailed runtime validation results for the microservices can be found in [MICROSERVICE_DEPLOYMENT_VALIDATION.md](file:///Users/vania/Desktop/juan/icesi/VIII/ingesoftV/talleres/circle-guard-public/MICROSERVICE_DEPLOYMENT_VALIDATION.md).
 
+## Jenkins CI/CD Integration
+
+This repository provides manifests and a sample `Jenkinsfile` to run CI/CD inside the cluster.
+
+- The Jenkins resources are under `k8s/base/services/jenkins` and RBAC under `k8s/base/rbac`.
+- The pipeline in the repository root (`Jenkinsfile`) builds the 6 selected services, produces Docker images under `docker.io/juanc0410/`, and deploys them using Kustomize overlays.
+- The in-cluster Jenkins is configured for a Docker-outside-of-Docker (DooD) build strategy. Ensure at least one node is labeled `docker-builder=true` and has Docker Engine available.
+
+Operational quick-commands:
+
+```bash
+# label a node as a builder
+kubectl label node <node-name> docker-builder=true
+
+# deploy the dev overlay (includes Jenkins in this workshop layout)
+kubectl apply -k k8s/overlays/dev
+
+# get Jenkins UI nodeport
+kubectl -n jenkins get svc jenkins
+```
+
+Security note: mounting the host Docker socket into agent pods is a security-sensitive operation; for production use consider Kaniko or BuildKit instead.
+
+
