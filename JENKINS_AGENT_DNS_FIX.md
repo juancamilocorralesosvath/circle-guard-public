@@ -80,6 +80,10 @@ metadata:
 spec:
   restartPolicy: Never
   dnsPolicy: ClusterFirst
+  # grant the pod supplementary group access so the non-root jenkins user
+  # can access the host docker socket (group ownership is usually root:root)
+  securityContext:
+    supplementalGroups: [0]
   containers:
     - name: jnlp
       image: juanc0410/jenkins-agent:latest
@@ -87,6 +91,9 @@ spec:
       securityContext:
         runAsUser: 1000
       workingDir: /home/jenkins/agent
+      env:
+        - name: DOCKER_HOST
+          value: unix:///var/run/docker.sock
       volumeMounts:
         - name: docker-sock
           mountPath: /var/run/docker.sock
@@ -94,7 +101,7 @@ spec:
     - name: docker-sock
       hostPath:
         path: /var/run/docker.sock
-        type: FileOrCreate
+        type: Socket
 ```
 
 Notes:

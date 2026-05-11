@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tmp-agent-test
+  namespace: jenkins
+spec:
+  restartPolicy: Never
+  dnsPolicy: ClusterFirst
+  securityContext:
+    supplementalGroups: [0]
+  volumes:
+    - name: docker-sock
+      hostPath:
+        path: /var/run/docker.sock
+        type: Socket
+  containers:
+    - name: nonroot
+      image: juanc0410/jenkins-agent:latest
+      imagePullPolicy: Always
+      securityContext:
+        runAsUser: 1000
+      env:
+        - name: DOCKER_HOST
+          value: unix:///var/run/docker.sock
+      command: ["sleep","3600"]
+      volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+    - name: root
+      image: juanc0410/jenkins-agent:latest
+      imagePullPolicy: Always
+      securityContext:
+        runAsUser: 0
+      env:
+        - name: DOCKER_HOST
+          value: unix:///var/run/docker.sock
+      command: ["sleep","3600"]
+      volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock

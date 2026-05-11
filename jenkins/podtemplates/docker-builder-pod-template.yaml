@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins/label: docker-builder
+spec:
+  serviceAccountName: jenkins
+  dnsPolicy: ClusterFirst
+  securityContext:
+    supplementalGroups: [0] # Replace 0 with the docker group's GID on nodes for production
+  containers:
+    - name: jnlp
+      image: juanc0410/jenkins-agent:latest
+      workingDir: /home/jenkins/agent
+      env:
+        - name: DOCKER_HOST
+          value: unix:///var/run/docker.sock
+    - name: docker
+      image: docker:24
+      command:
+        - cat
+      tty: true
+      volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+  volumes:
+    - name: docker-sock
+      hostPath:
+        path: /var/run/docker.sock
+        type: Socket
+  restartPolicy: Never

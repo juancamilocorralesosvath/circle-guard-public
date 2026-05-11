@@ -97,6 +97,16 @@ pipeline {
     }
   }
   post {
+    always {
+      publishHTML(target: [
+          allowMissing: false,
+          alwaysLinkToLastBuild: true,
+          keepAll: true,
+          reportDir: 'services/circleguard-form-service/build/reports/tests/test',
+          reportFiles: 'index.html',
+          reportName: 'JUnit Report'
+      ])
+    }
     failure {
       echo 'Pipeline failed — check logs and consider running rollback steps from CI_CD_RUNBOOK.md'
     }
