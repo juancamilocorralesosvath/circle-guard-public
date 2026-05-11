@@ -10,6 +10,8 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
   && rm kubectl
 # Install kustomize (simple installer)
 RUN KUSTOMIZE_VER=v5.1.0 && \
-  curl -sL https://github.com/kubernetes-sigs/kustomize/releases/download/${KUSTOMIZE_VER}/kustomize_${KUSTOMIZE_VER}_linux_amd64.tar.gz | tar xz && \
-  install -o root -g root -m 0755 kustomize /usr/local/bin/kustomize && rm kustomize
+  curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VER}/kustomize_${KUSTOMIZE_VER}_linux_arm64.tar.gz" \
+  | tar xz && \
+  install -o root -g root -m 0755 kustomize /usr/local/bin/kustomize && \
+  rm kustomize
 USER jenkins
