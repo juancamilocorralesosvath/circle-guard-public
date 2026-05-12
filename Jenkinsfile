@@ -31,6 +31,18 @@ pipeline {
         sh './gradlew test --no-daemon'
         junit allowEmptyResults: true, testResults: '**/build/test-results/**/*.xml'
       }
+      post {
+        always {
+          publishHTML(target: [
+              allowMissing: false,
+              alwaysLinkToLastBuild: true,
+              keepAll: true,
+              reportDir: 'services/circleguard-form-service/build/reports/tests/test',
+              reportFiles: 'index.html',
+              reportName: 'JUnit Report'
+          ])
+        }
+      }
     }
 
     stage('Build') {
@@ -97,16 +109,6 @@ pipeline {
     }
   }
   post {
-    always {
-      publishHTML(target: [
-          allowMissing: false,
-          alwaysLinkToLastBuild: true,
-          keepAll: true,
-          reportDir: 'services/circleguard-form-service/build/reports/tests/test',
-          reportFiles: 'index.html',
-          reportName: 'JUnit Report'
-      ])
-    }
     failure {
       echo 'Pipeline failed — check logs and consider running rollback steps from CI_CD_RUNBOOK.md'
     }
