@@ -5,7 +5,6 @@ namespace: circleguard-dev
 
 resources:
   - ../../base
-  - namespace.yaml
 
 images:
   - name: circleguard-auth-service

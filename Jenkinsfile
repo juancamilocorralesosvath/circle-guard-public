@@ -66,18 +66,21 @@ pipeline {
         script {
           try {
             withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
-              sh 'export KUBECONFIG=$KUBECONFIG_FILE'
-              // set images in kustomize overlay
-              SERVICES.split().each { svc ->
-                def image = "${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}:${GIT_COMMIT_SHORT}"
-                sh "kustomize edit set image circleguard-${svc}=${image} || true"
-              }
-              sh 'kustomize build k8s/overlays/dev | kubectl apply -f -'
-              // rollout validation
-              SERVICES.split().each { svc ->
-                def deploy = "circleguard-${svc}"
-                sh "kubectl rollout status deployment/${deploy} -n circleguard-dev --timeout=180s"
-              }
+              sh """
+                export KUBECONFIG=${KUBECONFIG_FILE}
+                # Ensure namespace exists
+                kubectl create namespace circleguard-dev --dry-run=client -o yaml | kubectl apply -f -
+                
+                # set images in kustomize overlay
+                cd k8s/overlays/dev
+                ${SERVICES.split().collect { svc -> "kustomize edit set image circleguard-${svc}=${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}:${GIT_COMMIT_SHORT}" }.join("\n                ")}
+                
+                # deploy
+                kustomize build . | kubectl apply -f -
+                
+                # rollout validation
+                ${SERVICES.split().collect { svc -> "kubectl rollout status deployment/circleguard-${svc} -n circleguard-dev --timeout=180s" }.join("\n                ")}
+              """
             }
           } catch (Exception e) {
             echo "Deployment failed or credentials missing: ${e.message}"
