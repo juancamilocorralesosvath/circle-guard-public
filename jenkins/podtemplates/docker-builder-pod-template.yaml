@@ -6,15 +6,26 @@ metadata:
 spec:
   serviceAccountName: jenkins
   dnsPolicy: ClusterFirst
+  dnsConfig:
+    nameservers:
+      - 8.8.8.8
+      - 1.1.1.1
+    options:
+      - name: ndots
+        value: "1"
   securityContext:
     supplementalGroups: [0] # Replace 0 with the docker group's GID on nodes for production
   containers:
     - name: jnlp
       image: juanc0410/jenkins-agent:latest
+      imagePullPolicy: Always
       workingDir: /home/jenkins/agent
       env:
         - name: DOCKER_HOST
           value: unix:///var/run/docker.sock
+      volumeMounts:
+        - name: gradle-cache
+          mountPath: /home/jenkins/.gradle
     - name: docker
       image: docker:24
       command:
@@ -28,4 +39,8 @@ spec:
       hostPath:
         path: /var/run/docker.sock
         type: Socket
+    - name: gradle-cache
+      hostPath:
+        path: /Users/vania/.gradle
+        type: Directory
   restartPolicy: Never
