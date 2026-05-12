@@ -12,6 +12,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.kafka:spring-kafka")
+    testImplementation("org.springframework.kafka:spring-kafka-test")
     implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("com.twilio.sdk:twilio:10.1.1")
     implementation("org.springframework.boot:spring-boot-starter-webflux")

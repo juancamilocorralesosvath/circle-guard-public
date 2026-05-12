@@ -1,6 +1,7 @@
 package com.circleguard.notification.integration;
 
 import com.circleguard.notification.service.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,10 +38,14 @@ import static org.mockito.Mockito.*;
  * APPROACH:
  *   - @EmbeddedKafka for in-process Kafka.
  *   - @MockBean for EmailService, SmsService, PushService (all in mock mode).
- *   - KafkaTemplate to publish test events directly.
+ *   - Publish JSON strings with StringSerializer (matches StringDeserializer + listener(String)).
  *   - Mockito timeout() to handle async delivery within a 5-second window.
  */
-@SpringBootTest
+@SpringBootTest(properties = {
+        "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
+        "spring.kafka.producer.key-serializer=org.apache.kafka.common.serialization.StringSerializer",
+        "spring.kafka.producer.value-serializer=org.apache.kafka.common.serialization.StringSerializer"
+})
 @EmbeddedKafka(
         partitions = 1,
         topics = {"promotion.status.changed"},
@@ -50,6 +55,9 @@ class NotificationKafkaDispatchIntegrationTest {
 
     @Autowired
     private KafkaTemplate<String, Object> kafkaTemplate;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @MockBean
     private EmailService emailService;
@@ -89,6 +97,17 @@ class NotificationKafkaDispatchIntegrationTest {
         );
     }
 
+    /** Match production: consumer uses StringDeserializer + JSON; use StringSerializer on the producer. */
+    private void sendStatusEvent(String anonymousId, String status) {
+        try {
+            String json = objectMapper.writeValueAsString(statusEvent(anonymousId, status));
+            kafkaTemplate.send(TOPIC, anonymousId, json);
+            kafkaTemplate.flush();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     // ── Tests ────────────────────────────────────────────────────────────────
 
     /**
@@ -96,10 +115,10 @@ class NotificationKafkaDispatchIntegrationTest {
      */
     @Test
     @DisplayName("IT-4.1: SUSPECT status event triggers email, SMS, and push dispatch")
-    void suspectEvent_TriggersAllThreeChannels() throws Exception {
+    void suspectEvent_TriggersAllThreeChannels() {
         String anonymousId = "user-suspect-" + System.nanoTime();
 
-        kafkaTemplate.send(TOPIC, anonymousId, statusEvent(anonymousId, "SUSPECT"));
+        sendStatusEvent(anonymousId, "SUSPECT");
 
         // Use Mockito timeout() to allow async Kafka consumption up to 5 s
         verify(emailService, timeout(5_000).times(1)).sendAsync(eq(anonymousId), anyString());
@@ -115,7 +134,7 @@ class NotificationKafkaDispatchIntegrationTest {
     void activeEvent_DoesNotTriggerNotifications() throws InterruptedException {
         String anonymousId = "user-active-" + System.nanoTime();
 
-        kafkaTemplate.send(TOPIC, anonymousId, statusEvent(anonymousId, "ACTIVE"));
+        sendStatusEvent(anonymousId, "ACTIVE");
 
         // Wait a generous window for any spurious invocation
         TimeUnit.SECONDS.sleep(3);
@@ -133,7 +152,7 @@ class NotificationKafkaDispatchIntegrationTest {
     void probableEvent_TriggersAllThreeChannels() {
         String anonymousId = "user-probable-" + System.nanoTime();
 
-        kafkaTemplate.send(TOPIC, anonymousId, statusEvent(anonymousId, "PROBABLE"));
+        sendStatusEvent(anonymousId, "PROBABLE");
 
         verify(emailService, timeout(5_000).times(1)).sendAsync(eq(anonymousId), anyString());
         verify(smsService,   timeout(5_000).times(1)).sendAsync(eq(anonymousId), anyString());
@@ -149,7 +168,7 @@ class NotificationKafkaDispatchIntegrationTest {
         String anonymousId = "user-unknown-" + System.nanoTime();
 
         // This must not crash the listener
-        kafkaTemplate.send(TOPIC, anonymousId, statusEvent(anonymousId, "UNKNOWN"));
+        sendStatusEvent(anonymousId, "UNKNOWN");
 
         TimeUnit.SECONDS.sleep(3);
 
@@ -166,8 +185,8 @@ class NotificationKafkaDispatchIntegrationTest {
         String id1 = "user-rapid-1-" + System.nanoTime();
         String id2 = "user-rapid-2-" + System.nanoTime();
 
-        kafkaTemplate.send(TOPIC, id1, statusEvent(id1, "SUSPECT"));
-        kafkaTemplate.send(TOPIC, id2, statusEvent(id2, "SUSPECT"));
+        sendStatusEvent(id1, "SUSPECT");
+        sendStatusEvent(id2, "SUSPECT");
 
         // Each user must receive their own notification (2 total calls per channel)
         verify(emailService, timeout(8_000).times(2)).sendAsync(anyString(), anyString());

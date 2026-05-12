@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -21,6 +23,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -42,6 +45,7 @@ import static org.mockito.Mockito.*;
  *   6. Fence window calculates remaining days correctly in exception message.
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class HealthStatusServiceFenceWindowTest {
 
     @Mock private UserNodeRepository userNodeRepository;
@@ -68,9 +72,9 @@ class HealthStatusServiceFenceWindowTest {
         );
 
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
-        doNothing().when(valueOps).set(anyString(), anyString());
+        doNothing().when(valueOps).multiSet(anyMap());
 
-        // Default 14-day fence settings
+        // Default 14-day fence settings (only read when fence branch runs for SUSPECT/PROBABLE)
         SystemSettings settings = SystemSettings.builder()
                 .mandatoryFenceDays(14)
                 .encounterWindowDays(14)

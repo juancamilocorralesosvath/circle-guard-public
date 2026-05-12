@@ -9,6 +9,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.security.Key;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.UUID;
 
@@ -17,19 +21,17 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit Test 1: QrTokenService – Rotating Token Expiry Enforcement
  *
- * WHY CRITICAL:
- *   The 60-second rotating QR token is the physical access-control mechanism for
- *   every campus entry point.  If expiry is not enforced, a student whose status
- *   was changed to SUSPECT after scanning could still enter using a stale token.
- *   This test validates the complete token lifecycle: generation → acceptance →
- *   expiry → rejection, with no external infrastructure required.
+ * WHY CRITICAL: The 60-second rotating QR token is the physical access-control
+ * mechanism for every campus entry point. If expiry is not enforced, a student
+ * whose status was changed to SUSPECT after scanning could still enter using a
+ * stale token. This test validates the complete token lifecycle: generation →
+ * acceptance → expiry → rejection, with no external infrastructure required.
  *
- * WHAT IS VALIDATED:
- *   1. A freshly generated token with a valid TTL is parsed successfully.
- *   2. A token generated with a past expiry (TTL = 1 ms) is rejected with
- *      ExpiredJwtException after the clock advances.
- *   3. The anonymousId embedded in the token matches the original UUID.
- *   4. Tampered tokens (wrong signature key) are rejected with SignatureException.
+ * WHAT IS VALIDATED: 1. A freshly generated token with a valid TTL is parsed
+ * successfully. 2. A token generated with a past expiry (TTL = 1 ms) is
+ * rejected with ExpiredJwtException after the clock advances. 3. The
+ * anonymousId embedded in the token matches the original UUID. 4. Tampered
+ * tokens (wrong signature key) are rejected with SignatureException.
  */
 class QrTokenServiceExpiryTest {
 
@@ -83,14 +85,14 @@ class QrTokenServiceExpiryTest {
         String token = shortLivedService.generateQrToken(anonymousId);
 
         // Let the clock advance past the 1 ms TTL
-        Thread.sleep(10);
+        Thread.sleep(50);
 
         Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
-        assertThrows(ExpiredJwtException.class, () ->
-                        Jwts.parserBuilder()
-                                .setSigningKey(key)
-                                .build()
-                                .parseClaimsJws(token),
+        assertThrows(ExpiredJwtException.class, ()
+                -> Jwts.parserBuilder()
+                        .setSigningKey(key)
+                        .build()
+                        .parseClaimsJws(token),
                 "Parsing an expired token must throw ExpiredJwtException");
     }
 
@@ -106,11 +108,11 @@ class QrTokenServiceExpiryTest {
         Key wrongKey = Keys.hmacShaKeyFor("completely-different-secret-key-32!!".getBytes());
 
         // Any JWT security exception signals rejection – acceptable subtypes vary by library version
-        assertThrows(Exception.class, () ->
-                        Jwts.parserBuilder()
-                                .setSigningKey(wrongKey)
-                                .build()
-                                .parseClaimsJws(token),
+        assertThrows(Exception.class, ()
+                -> Jwts.parserBuilder()
+                        .setSigningKey(wrongKey)
+                        .build()
+                        .parseClaimsJws(token),
                 "A token signed with a different key must be rejected");
     }
 
@@ -122,12 +124,18 @@ class QrTokenServiceExpiryTest {
     void consecutiveTokens_ForSameUser_AreDistinct() throws InterruptedException {
         UUID anonymousId = UUID.randomUUID();
 
-        String token1 = qrTokenService.generateQrToken(anonymousId);
-        Thread.sleep(2); // ensure issuedAt millis differ
-        String token2 = qrTokenService.generateQrToken(anonymousId);
+        // iat/exp are second-precision in JWT; offset clocks by >1s so tokens differ
+        Instant now = Instant.now();
+        Clock clock1 = Clock.fixed(now, ZoneOffset.UTC);
+        Clock clock2 = Clock.offset(clock1, Duration.ofSeconds(2));
 
-        assertNotEquals(token1, token2,
-                "Consecutive tokens must differ because issuedAt timestamps will differ");
+        QrTokenService s1 = new QrTokenService(SECRET, 60_000L, clock1);
+        QrTokenService s2 = new QrTokenService(SECRET, 60_000L, clock2);
+
+        String token1 = s1.generateQrToken(anonymousId);
+        String token2 = s2.generateQrToken(anonymousId);
+
+        assertNotEquals(token1, token2, "Consecutive tokens must differ because iat/exp differ by at least one second");
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -137,9 +145,12 @@ class QrTokenServiceExpiryTest {
     @DisplayName("Generated token contains both issuedAt and expiration date claims")
     void generatedToken_ContainsIssuedAtAndExpiration() {
         UUID anonymousId = UUID.randomUUID();
-        long beforeMs = System.currentTimeMillis();
+        // Parser validates exp against real time; pin "now" so the token is not expired when parsed
+        Instant now = Instant.now();
+        Clock fixedClock = Clock.fixed(now, ZoneOffset.UTC);
+        QrTokenService deterministicService = new QrTokenService(SECRET, 60_000L, fixedClock);
 
-        String token = qrTokenService.generateQrToken(anonymousId);
+        String token = deterministicService.generateQrToken(anonymousId);
 
         Key key = Keys.hmacShaKeyFor(SECRET.getBytes());
         var claims = Jwts.parserBuilder()
@@ -154,11 +165,10 @@ class QrTokenServiceExpiryTest {
         long issuedMs = claims.getIssuedAt().getTime();
         long expiresMs = claims.getExpiration().getTime();
 
-        assertTrue(issuedMs >= beforeMs, "issuedAt must be at or after test start");
+        assertEquals(now.getEpochSecond(), claims.getIssuedAt().toInstant().getEpochSecond(),
+                "JWT iat is second-precision; compare epoch seconds to the fixed clock");
         assertTrue(expiresMs > issuedMs, "expiration must be strictly after issuedAt");
-        // For a 60-second TTL the delta should be approximately 60,000 ms (allow ±1 s)
         long ttlMs = expiresMs - issuedMs;
-        assertTrue(ttlMs >= 59_000 && ttlMs <= 61_000,
-                "TTL should be ~60 000 ms, but was " + ttlMs + " ms");
+        assertEquals(60_000L, ttlMs, "TTL should be exactly 60000 ms when using deterministic clock");
     }
 }

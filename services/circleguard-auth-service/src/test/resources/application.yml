@@ -2,6 +2,14 @@ jwt:
   secret: "my-super-secret-test-key-32-chars-long"
   expiration: 3600000
 
+qr:
+  secret: "my-qr-secret-key-for-dev-1234567890"
+  expiration: 60000
+
+identity:
+  service:
+    url: http://localhost:8083
+
 spring:
   main:
     allow-bean-definition-overriding: true

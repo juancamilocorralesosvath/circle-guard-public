@@ -69,7 +69,7 @@ class IdentityVaultControllerTest {
     void lookupIdentity_NotFound_Returns404ProblemDetail() throws Exception {
         UUID anonymousId = UUID.randomUUID();
         when(vaultService.resolveRealIdentity(anonymousId))
-            .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Identity not found"));
+                .thenThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Identity not found"));
 
         mockMvc.perform(get("/api/v1/identities/lookup/{id}", anonymousId))
                 .andExpect(status().isNotFound())

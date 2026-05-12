@@ -1,15 +1,19 @@
 package com.circleguard.form.integration;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.circleguard.form.model.*;
 import com.circleguard.form.service.HealthSurveyService;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
+import com.circleguard.form.service.QuestionnaireService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.stereotype.Component;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -45,10 +49,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   - An in-process KafkaListener captures the published events for assertions.
  */
 @SpringBootTest
-@EmbeddedKafka(partitions = 1, topics = {"survey.submitted"}, brokerProperties = {
-        "listeners=PLAINTEXT://localhost:${kafka.port:0}",
-        "auto.create.topics.enable=true"
-})
+@ActiveProfiles("integration")
+@Import(SurveyKafkaCascadeIntegrationTest.SurveyEventCapture.class)
+@EmbeddedKafka(partitions = 1, topics = {"survey.submitted"})
 @Testcontainers
 class SurveyKafkaCascadeIntegrationTest {
 
@@ -63,10 +66,22 @@ class SurveyKafkaCascadeIntegrationTest {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.PostgreSQLDialect");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "update");
     }
 
     @Autowired
     private HealthSurveyService surveyService;
+
+    @Autowired
+    private QuestionnaireService questionnaireService;
+
+    @Autowired
+    private KafkaTemplate<String, Object> kafkaTemplate;
+
+    /** Fever question id from the active questionnaire seeded each test. */
+    private UUID feverQuestionId;
 
     // ── In-process event capture ──────────────────────────────────────────────
 
@@ -76,11 +91,15 @@ class SurveyKafkaCascadeIntegrationTest {
      */
     @Component
     static class SurveyEventCapture {
+        private static final ObjectMapper MAPPER = new ObjectMapper();
         private final BlockingQueue<Map<String, Object>> events = new LinkedBlockingQueue<>();
 
-        @KafkaListener(topics = "survey.submitted", groupId = "integration-test-group")
-        void capture(Map<String, Object> event) {
-            events.add(event);
+        @KafkaListener(
+                topics = "survey.submitted",
+                groupId = "survey-kafka-cascade-it",
+                properties = {"auto.offset.reset=earliest"})
+        void capture(String json) throws Exception {
+            events.add(MAPPER.readValue(json, new TypeReference<Map<String, Object>>() {}));
         }
 
         Map<String, Object> poll(long timeoutSeconds) throws InterruptedException {
@@ -94,8 +113,30 @@ class SurveyKafkaCascadeIntegrationTest {
     private SurveyEventCapture capture;
 
     @BeforeEach
-    void clearCapture() {
+    void seedQuestionnaireAndClearCapture() {
         capture.clear();
+
+        Questionnaire questionnaire = Questionnaire.builder()
+                .title("Integration test questionnaire")
+                .version(999)
+                .isActive(false)
+                .build();
+        Question feverQuestion = Question.builder()
+                .text("Do you have a fever?")
+                .type(QuestionType.YES_NO)
+                .orderIndex(0)
+                .questionnaire(questionnaire)
+                .build();
+        questionnaire.setQuestions(new ArrayList<>(List.of(feverQuestion)));
+
+        Questionnaire saved = questionnaireService.saveQuestionnaire(questionnaire);
+        feverQuestionId = saved.getQuestions().get(0).getId();
+        questionnaireService.activateQuestionnaire(saved.getId());
+    }
+
+    private void submitSurveyAndFlushKafka(HealthSurvey survey) {
+        surveyService.submitSurvey(survey);
+        kafkaTemplate.flush();
     }
 
     // ── Tests ────────────────────────────────────────────────────────────────
@@ -111,9 +152,10 @@ class SurveyKafkaCascadeIntegrationTest {
                 .anonymousId(anonymousId)
                 .hasFever(true)
                 .hasCough(false)
+                .responses(Map.of(feverQuestionId.toString(), "YES"))
                 .build();
 
-        surveyService.submitSurvey(survey);
+        submitSurveyAndFlushKafka(survey);
 
         Map<String, Object> event = capture.poll(5);
         assertThat(event).isNotNull();
@@ -132,9 +174,10 @@ class SurveyKafkaCascadeIntegrationTest {
                 .anonymousId(anonymousId)
                 .hasFever(false)
                 .hasCough(false)
+                .responses(Map.of(feverQuestionId.toString(), "NO"))
                 .build();
 
-        surveyService.submitSurvey(survey);
+        submitSurveyAndFlushKafka(survey);
 
         Map<String, Object> event = capture.poll(5);
         assertThat(event).isNotNull();
@@ -151,10 +194,11 @@ class SurveyKafkaCascadeIntegrationTest {
         HealthSurvey survey = HealthSurvey.builder()
                 .anonymousId(anonymousId)
                 .hasFever(true)
+                .responses(Map.of(feverQuestionId.toString(), "YES"))
                 .build();
 
         long start = System.currentTimeMillis();
-        surveyService.submitSurvey(survey);
+        submitSurveyAndFlushKafka(survey);
         Map<String, Object> event = capture.poll(5);
         long elapsed = System.currentTimeMillis() - start;
 
@@ -171,9 +215,10 @@ class SurveyKafkaCascadeIntegrationTest {
         HealthSurvey survey = HealthSurvey.builder()
                 .anonymousId(UUID.randomUUID())
                 .hasFever(true)
+                .responses(Map.of(feverQuestionId.toString(), "YES"))
                 .build();
 
-        surveyService.submitSurvey(survey);
+        submitSurveyAndFlushKafka(survey);
 
         Map<String, Object> event = capture.poll(5);
         assertThat(event).isNotNull();
@@ -193,9 +238,10 @@ class SurveyKafkaCascadeIntegrationTest {
                 .hasFever(true)
                 .attachmentPath("cert-" + anonymousId + ".pdf")
                 .validationStatus(ValidationStatus.PENDING)
+                .responses(Map.of(feverQuestionId.toString(), "YES"))
                 .build();
 
-        surveyService.submitSurvey(survey);
+        submitSurveyAndFlushKafka(survey);
 
         Map<String, Object> event = capture.poll(5);
         assertThat(event).isNotNull();

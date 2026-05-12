@@ -1,0 +1,8 @@
+# Used with @ActiveProfiles("integration") + @EmbeddedKafka so the app does not target kafka-service:9092 from main application.yml
+spring:
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+    consumer:
+      auto-offset-reset: earliest
+      properties:
+        spring.json.trusted.packages: "*"
