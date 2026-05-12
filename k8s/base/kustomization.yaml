@@ -20,6 +20,3 @@ resources:
   - services/promotion-service.yaml
   - services/gateway-service.yaml
   - services/notification-service.yaml
-  # RBAC
-  - rbac/jenkins-clusterrole.yaml
-  - rbac/jenkins-clusterrolebinding.yaml
