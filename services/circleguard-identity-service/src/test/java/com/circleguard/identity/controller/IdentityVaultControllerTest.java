@@ -15,10 +15,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import com.circleguard.identity.config.SecurityConfig;
 
 @WebMvcTest(IdentityVaultController.class)
 @Import(SecurityConfig.class)
+@TestPropertySource(properties = "jwt.secret=my-super-secret-dev-key-32-chars-long-12345678")
 class IdentityVaultControllerTest {
 
     @Autowired
