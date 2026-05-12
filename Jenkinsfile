@@ -8,7 +8,6 @@ pipeline {
   options {
     ansiColor('xterm')
     timestamps()
-    // Optimization: Disable concurrent builds to keep the shared gradle cache consistent
     disableConcurrentBuilds()
   }
   stages {
@@ -21,7 +20,6 @@ pipeline {
 
     stage('Build & Test') {
       steps {
-        // Optimization: Build all JARs once using the shared host cache
         sh './gradlew clean build --no-daemon'
         junit allowEmptyResults: true, testResults: '**/build/test-results/**/*.xml'
         archiveArtifacts artifacts: 'services/**/build/libs/*.jar', fingerprint: true, allowEmptyArchive: true
@@ -40,6 +38,33 @@ pipeline {
       }
     }
 
+    stage('Generate Release Notes') {
+      when { 
+        anyOf {
+          branch 'master'
+          branch 'main'
+        }
+      }
+      steps {
+        script {
+          echo "Generating Release Notes..."
+          def releaseNotes = sh(script: 'git log --oneline -n 10', returnStdout: true).trim()
+          writeFile file: 'RELEASE_NOTES.md', text: """
+# Release Notes - ${env.BUILD_TAG}
+**Date:** ${new Date().format('yyyy-MM-dd HH:mm:ss')}
+**Commit:** ${env.GIT_COMMIT_SHORT}
+
+## Changes in this version:
+${releaseNotes}
+
+---
+Built by Jenkins
+""".trim()
+          archiveArtifacts artifacts: 'RELEASE_NOTES.md'
+        }
+      }
+    }
+
     stage('Docker Build & Push') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_HUB_PASS')]) {
@@ -48,7 +73,6 @@ pipeline {
             SERVICES.split().each { svc ->
               def image = "${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}"
               def tag = "${GIT_COMMIT_SHORT}"
-              // Optimization: Docker build now just copies the pre-built JAR
               sh "docker build -t ${image}:${tag} -f services/circleguard-${svc}/Dockerfile ."
               sh "docker tag ${image}:${tag} ${image}:latest"
               sh "docker push ${image}:${tag}"
@@ -62,30 +86,32 @@ pipeline {
     stage('Deploy to Dev') {
       when { branch 'dev' }
       steps {
-        echo "Deploying to dev overlay"
         script {
-          try {
-            withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
-              sh """
-                export KUBECONFIG=${KUBECONFIG_FILE}
-                # Ensure namespace exists
-                kubectl create namespace circleguard-dev --dry-run=client -o yaml | kubectl apply -f -
-                
-                # set images in kustomize overlay
-                cd k8s/overlays/dev
-                ${SERVICES.split().collect { svc -> "kustomize edit set image circleguard-${svc}=${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}:${GIT_COMMIT_SHORT}" }.join("\n                ")}
-                
-                # deploy
-                kustomize build . | kubectl apply -f -
-                
-                # rollout validation
-                ${SERVICES.split().collect { svc -> "kubectl rollout status deployment/circleguard-${svc} -n circleguard-dev --timeout=180s" }.join("\n                ")}
-              """
-            }
-          } catch (Exception e) {
-            echo "Deployment failed or credentials missing: ${e.message}"
-            error "Deployment stage failed. Please ensure 'kubeconfig-juanc0410' credential exists."
-          }
+          deployToEnv('dev', 'circleguard-dev')
+        }
+      }
+    }
+
+    stage('Deploy to Stage') {
+      when { branch 'staging' }
+      steps {
+        script {
+          deployToEnv('staging', 'circleguard-staging')
+        }
+      }
+    }
+
+    stage('Deploy to Production') {
+      when { 
+        anyOf {
+          branch 'master'
+          branch 'main'
+        }
+      }
+      steps {
+        script {
+          // Point 5: Mandatory validation of system tests could be added here
+          deployToEnv('prod', 'circleguard-prod')
         }
       }
     }
@@ -93,11 +119,12 @@ pipeline {
     stage('Smoke Tests') {
       steps {
         script {
+          def targetNs = (env.BRANCH_NAME == 'dev') ? 'circleguard-dev' : (env.BRANCH_NAME == 'staging' ? 'circleguard-staging' : 'circleguard-prod')
           try {
-            echo 'Running lightweight in-cluster smoke checks'
+            echo "Running smoke checks in ${targetNs}"
             withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
               sh 'export KUBECONFIG=$KUBECONFIG_FILE'
-              sh "kubectl run --rm -i --restart=Never smoke-curl -n circleguard-dev --image=radial/busyboxplus:curl -- sh -c \"curl -sS http://circleguard-auth-service:8180/actuator/health/readiness\""
+              sh "kubectl run --rm -i --restart=Never smoke-curl -n ${targetNs} --image=radial/busyboxplus:curl -- sh -c \"curl -sS http://circleguard-auth-service:8180/actuator/health/readiness\""
             }
           } catch (Exception e) {
             echo "Smoke tests skipped or failed: ${e.message}"
@@ -111,4 +138,26 @@ pipeline {
       echo 'Pipeline failed — check logs and consider running rollback steps from CI_CD_RUNBOOK.md'
     }
   }
+}
+
+def deployToEnv(String overlay, String namespace) {
+    echo "Deploying to ${overlay} overlay in namespace ${namespace}"
+    try {
+      withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+        sh """
+          export KUBECONFIG=${KUBECONFIG_FILE}
+          kubectl create namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -
+          
+          cd k8s/overlays/${overlay}
+          ${SERVICES.split().collect { svc -> "kustomize edit set image circleguard-${svc}=${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}:${GIT_COMMIT_SHORT}" }.join("\n          ")}
+          
+          kustomize build . | kubectl apply -f -
+          
+          ${SERVICES.split().collect { svc -> "kubectl rollout status deployment/circleguard-${svc} -n ${namespace} --timeout=180s" }.join("\n          ")}
+        """
+      }
+    } catch (Exception e) {
+      echo "Deployment to ${overlay} failed: ${e.message}"
+      error "Deployment stage failed."
+    }
 }
