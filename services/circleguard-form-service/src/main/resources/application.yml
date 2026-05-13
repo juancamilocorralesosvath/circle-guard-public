@@ -2,9 +2,9 @@ spring:
   application:
     name: circleguard-form-service
   datasource:
-    url: jdbc:postgresql://${DB_HOST:postgres-service}:${DB_PORT:5432}/${DB_NAME:circleguard_form}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:15432}/${DB_NAME:circleguard_form}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -13,7 +13,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka-service:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
@@ -30,12 +30,3 @@ management:
     health:
       probes:
         enabled: true
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-  datasource:
-    username: ${DB_USERNAME:admin}
-    password: ${DB_PASSWORD:password}

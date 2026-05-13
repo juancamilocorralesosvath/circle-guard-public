@@ -15,6 +15,9 @@ public class HealthSurveyController {
 
     @PostMapping
     public ResponseEntity<HealthSurvey> submit(@RequestBody HealthSurvey survey) {
+        if (survey == null || survey.getAnonymousId() == null) {
+            throw new IllegalArgumentException("anonymousId is required");
+        }
         return ResponseEntity.ok(surveyService.submitSurvey(survey));
     }
 }

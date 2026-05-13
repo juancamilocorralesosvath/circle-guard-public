@@ -79,8 +79,17 @@ public class CircleService {
     @Transactional("neo4jTransactionManager")
     public CircleNode addMember(Long circleId, String anonymousId) {
         log.info("Manually adding user {} to circle {}", anonymousId, circleId);
+        
+        var existingMember = circleRepository.findCirclesByUser(anonymousId).stream()
+                .filter(c -> c.getId().equals(circleId))
+                .findFirst();
+        
+        if (existingMember.isPresent()) {
+            throw new IllegalStateException("User is already a member of this circle");
+        }
+        
         return circleRepository.addUserToCircle(anonymousId, circleId)
-                .orElseThrow(() -> new RuntimeException("Failed to add user to circle"));
+                .orElseThrow(() -> new IllegalArgumentException("Circle not found or user not found"));
     }
 
     public List<CircleNode> getUserCircles(String anonymousId) {

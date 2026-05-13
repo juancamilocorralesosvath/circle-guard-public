@@ -2,14 +2,14 @@ spring:
   application:
     name: circleguard-notification-service
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka-service:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       group-id: notification-group
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
   mail:
-    host: ${MAIL_HOST:mail-service}
+    host: ${MAIL_HOST:localhost}
     port: ${MAIL_PORT:25}
     properties:
       mail:
@@ -20,14 +20,14 @@ spring:
 
 auth:
   api:
-    url: ${AUTH_API_URL:http://circleguard-auth-service:8180}
+    url: ${AUTH_API_URL:http://localhost:8180}
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}
   expiration: ${JWT_EXPIRATION:3600000}
 
 qr:
-  secret: ${QR_SECRET}
+  secret: ${QR_SECRET:my-qr-secret-key-for-dev-1234567890}
   expiration: ${QR_EXPIRATION:300}
 
 server:
@@ -42,15 +42,3 @@ management:
     health:
       probes:
         enabled: true
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-
-jwt:
-  secret: ${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}
-
-qr:
-  secret: ${QR_SECRET:my-qr-secret-key-for-dev-1234567890}

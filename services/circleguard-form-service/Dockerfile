@@ -1,7 +1,5 @@
-FROM eclipse-temurin:21-jre-jammy
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY services/circleguard-form-service/build/libs/*.jar /app/
-RUN find /app -name "circleguard-*.jar" ! -name "*-plain.jar" -exec mv {} /app/app.jar \;
-ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
-EXPOSE 8082
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+COPY build/libs/circleguard-form-service-1.0.0-SNAPSHOT.jar app.jar
+EXPOSE 8086
+ENTRYPOINT ["java", "-jar", "/app.jar"]

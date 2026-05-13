@@ -30,15 +30,20 @@ public class HealthStatsController {
 
         Map<String, Object> result = new LinkedHashMap<>();
         long grandTotal = 0;
+        long confirmedCount = 0;
 
         for (Map<String, Object> row : rows) {
             String status = row.get("status") != null ? row.get("status").toString() : "UNKNOWN";
             long count = ((Number) row.get("total")).longValue();
             result.put(status.toLowerCase() + "Count", count);
             grandTotal += count;
+            if ("CONFIRMED".equals(status)) {
+                confirmedCount = count;
+            }
         }
 
         result.put("totalUsers", grandTotal);
+        result.put("confirmedCount", confirmedCount);
         result.put("timestamp", new Date());
         return ResponseEntity.ok(result);
     }

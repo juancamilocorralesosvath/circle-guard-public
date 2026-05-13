@@ -93,6 +93,10 @@ docker-compose -f docker-compose.dev.yml up -d
 ```
 *Middleware includes: PostgreSQL, Neo4j, Kafka, Zookeeper, Redis, and OpenLDAP.*
 
+PostgreSQL is published on **host port 15432** (maps to container 5432) so another Postgres or tool can keep using **5432** on your machine. Microservices default to `localhost:15432` for local `bootRun`. For Kubernetes Postgres from the host, run `kubectl port-forward -n <ns> svc/postgres-service 15432:5432`.
+
+**promotion-service** also needs **Neo4j Bolt on `localhost:7687`**, **Kafka on `localhost:9092`**, and **Redis on `localhost:6379`** (all published by the same compose file, or port-forward `neo4j-service` 7687, your Kafka service, and `redis-service` 6379 from Kubernetes if you use cluster middleware).
+
 ### 2. Build & Run
 CircleGuard uses Gradle for parallel builds across services:
 ```bash

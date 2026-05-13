@@ -2,9 +2,10 @@ spring:
   application:
     name: circleguard-auth-service
   datasource:
-    url: jdbc:postgresql://${DB_HOST:postgres-service}:${DB_PORT:5432}/${DB_NAME:circleguard_auth}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    # Default host port 15432 matches docker-compose.dev.yml (avoids macOS 5432 conflicts). K8s sets DB_HOST/DB_PORT via ConfigMap.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:15432}/${DB_NAME:circleguard_auth}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -13,17 +14,17 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   ldap:
-    urls: ldap://${LDAP_HOST:openldap-service}:${LDAP_PORT:389}
+    urls: ldap://${LDAP_HOST:localhost}:${LDAP_PORT:389}
     base: ${LDAP_BASE:dc=circleguard,dc=edu}
-    username: ${LDAP_USER}
-    password: ${LDAP_PASSWORD}
+    username: ${LDAP_USER:cn=admin,dc=circleguard,dc=edu}
+    password: ${LDAP_PASSWORD:admin}
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}
   expiration: ${JWT_EXPIRATION:3600000}
 
 qr:
-  secret: ${QR_SECRET}
+  secret: ${QR_SECRET:my-qr-secret-key-for-dev-1234567890}
   expiration: ${QR_EXPIRATION:300}
 
 server:
@@ -38,21 +39,3 @@ management:
     health:
       probes:
         enabled: true
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-  datasource:
-    username: ${DB_USERNAME:admin}
-    password: ${DB_PASSWORD:password}
-  ldap:
-    username: ${LDAP_USER:cn=admin,dc=circleguard,dc=edu}
-    password: ${LDAP_PASSWORD:admin}
-
-jwt:
-  secret: ${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}
-
-qr:
-  secret: ${QR_SECRET:my-qr-secret-key-for-dev-1234567890}

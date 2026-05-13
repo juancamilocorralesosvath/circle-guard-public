@@ -5,9 +5,10 @@ spring:
     problemdetails:
       enabled: true
   datasource:
-    url: jdbc:postgresql://${DB_HOST:postgres-service}:${DB_PORT:5432}/${DB_NAME:circleguard_identity}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    # Default host port 15432 matches docker-compose.dev.yml. K8s overrides DB_HOST/DB_PORT via ConfigMap.
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:15432}/${DB_NAME:circleguard_identity}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -17,12 +18,12 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 vault:
-  secret: ${VAULT_SECRET}
-  salt: ${VAULT_SALT}
-  hash-salt: ${VAULT_HASH_SALT}
+  secret: ${VAULT_SECRET:746573742d7365637265742d33322d63686172732d6c6f6e672d313233343536}
+  salt: ${VAULT_SALT:deadbeef}
+  hash-salt: ${VAULT_HASH_SALT:12345678}
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}
 
 server:
   port: ${SERVER_PORT:8083}
@@ -36,20 +37,3 @@ management:
     health:
       probes:
         enabled: true
-
----
-spring:
-  config:
-    activate:
-      on-profile: dev
-  datasource:
-    username: ${DB_USERNAME:admin}
-    password: ${DB_PASSWORD:password}
-
-vault:
-  secret: ${VAULT_SECRET:746573742d7365637265742d33322d63686172732d6c6f6e672d313233343536}
-  salt: ${VAULT_SALT:deadbeef}
-  hash-salt: ${VAULT_HASH_SALT:12345678}
-
-jwt:
-  secret: ${JWT_SECRET:my-super-secret-dev-key-32-chars-long-12345678}

@@ -2,9 +2,9 @@ spring:
   application:
     name: circleguard-dashboard-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/circleguard_dashboard
-    username: admin
-    password: password
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:15432}/${DB_NAME:circleguard_dashboard}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -14,4 +14,4 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 server:
-  port: 8084
+  port: ${SERVER_PORT:8084}
