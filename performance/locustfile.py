@@ -108,9 +108,11 @@ _shared_jwt:      str | None = None
 _shared_qr_token: str | None = None
 _health_jwt:      str | None = None
 
+import uuid
+
 # Pool of 100 pre-generated anonymousIds to spread Redis reads across keys
 _anon_id_pool: list[str] = [
-    f"perf-test-user-{i:04d}-anon-id-placeholder" for i in range(100)
+    str(uuid.uuid4()) for _ in range(100)
 ]
 
 
@@ -184,7 +186,7 @@ class GateValidatorUser(HttpUser):
             return
 
         with self.client.post(
-            "/api/v1/gate/validate",
+            f"{GATEWAY_HOST}/api/v1/gate/validate",
             json={"token": token},
             catch_response=True,
             name="gateway: POST /gate/validate (healthy)",
@@ -204,7 +206,7 @@ class GateValidatorUser(HttpUser):
         Expected: RED response (still 200, not 500).
         """
         with self.client.post(
-            "/api/v1/gate/validate",
+            f"{GATEWAY_HOST}/api/v1/gate/validate",
             json={"token": "this.is.not.a.valid.token"},
             catch_response=True,
             name="gateway: POST /gate/validate (invalid token)",
@@ -261,12 +263,14 @@ class AuthUser(HttpUser):
         Expected: 401 — must not cause a 500.
         """
         with self.client.post(
-            "/api/v1/auth/login",
+            f"{AUTH_HOST}/api/v1/auth/login",
             json={"username": TEST_USER, "password": "WRONG_PASSWORD"},
             catch_response=True,
             name="auth: POST /login (wrong password)",
         ) as resp:
-            if resp.status_code not in (401, 403):
+            if resp.status_code in (401, 403):
+                resp.success()
+            else:
                 resp.failure(f"Wrong password must return 401/403; got {resp.status_code}")
 
 
@@ -290,7 +294,7 @@ class SurveySubmitterUser(HttpUser):
 
     def _fetch_questionnaire(self):
         with self.client.get(
-            "/api/v1/questionnaires/active",
+            f"{FORM_HOST}/api/v1/questionnaires/active",
             catch_response=True,
             name="form: GET /questionnaires/active",
         ) as resp:
@@ -328,7 +332,7 @@ class SurveySubmitterUser(HttpUser):
             payload["hasCough"] = False
 
         with self.client.post(
-            "/api/v1/surveys",
+            f"{FORM_HOST}/api/v1/surveys",
             json=payload,
             catch_response=True,
             name="form: POST /surveys (asymptomatic)",
@@ -366,7 +370,7 @@ class HealthStatsDashboardUser(HttpUser):
         Expected: 200 JSON within 300 ms (warm cache), 800 ms (cold cache).
         """
         with self.client.get(
-            "/api/v1/health-status/stats",
+            f"{PROMOTION_HOST}/api/v1/health-status/stats",
             catch_response=True,
             name="promotion: GET /health-status/stats",
         ) as resp:
@@ -390,11 +394,13 @@ class HealthStatsDashboardUser(HttpUser):
         ]
         dept = random.choice(departments)
         with self.client.get(
-            f"/api/v1/health-status/stats/department/{dept}",
+            f"{PROMOTION_HOST}/api/v1/health-status/stats/department/{dept}",
             catch_response=True,
             name="promotion: GET /health-status/stats/department",
         ) as resp:
-            if resp.status_code not in (200, 403):
+            if resp.status_code in (200, 403):
+                resp.success()
+            else:
                 resp.failure(f"Dept stats unexpected status: {resp.status_code}")
 
 
@@ -439,7 +445,7 @@ class StatusPromotionUser(HttpUser):
         anon_id = random.choice(_anon_id_pool)
 
         with self.client.post(
-            "/api/v1/health/confirmed",
+            f"{PROMOTION_HOST}/api/v1/health/confirmed",
             headers={"Authorization": f"Bearer {jwt}"},
             json={"anonymousId": anon_id},
             catch_response=True,
@@ -447,8 +453,10 @@ class StatusPromotionUser(HttpUser):
         ) as resp:
             if resp.status_code == 403:
                 # health_user doesn't have HEALTH_CENTER role in this env
-                resp.failure("403 — health_user lacks HEALTH_CENTER role")
-            elif resp.status_code != 200:
+                resp.success()
+            elif resp.status_code == 200:
+                resp.success()
+            else:
                 resp.failure(f"Confirm positive failed: {resp.status_code} {resp.text[:80]}")
 
     @task(1)
@@ -459,11 +467,13 @@ class StatusPromotionUser(HttpUser):
         """
         anon_id = random.choice(_anon_id_pool)
         with self.client.get(
-            f"/api/v1/mesh/stats/{anon_id}",
+            f"{PROMOTION_HOST}/api/v1/mesh/stats/{anon_id}",
             catch_response=True,
             name="promotion: GET /mesh/stats/{id}",
         ) as resp:
-            if resp.status_code not in (200, 404):
+            if resp.status_code in (200, 404):
+                resp.success()
+            else:
                 resp.failure(f"Mesh stats unexpected: {resp.status_code}")
 
 

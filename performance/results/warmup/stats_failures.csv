@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences
+POST,form: POST /surveys (asymptomatic),"CatchResponseError('Survey submission failed: 400 {""error"":""Invalid request: Send failed""}')",2

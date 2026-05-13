@@ -1,0 +1,4 @@
+Method,Name,Error,Occurrences
+GET,form: GET /questionnaires/active,HTTPError('400 Client Error:  for url: form: GET /questionnaires/active'),7
+POST,form: POST /surveys (asymptomatic),"CatchResponseError('Survey submission failed: 400 {""error"":""Invalid request: Could not open JPA EntityManager for transaction""}')",3
+POST,form: POST /surveys (asymptomatic),"CatchResponseError('Survey submission failed: 400 {""error"":""Invalid request: Send failed""}')",10

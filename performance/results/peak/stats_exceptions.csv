@@ -1,0 +1,24 @@
+Count,Message,Traceback,Nodes
+472,'name',"  File ""/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/locust/user/task.py"", line 340, in run
+    self.execute_next_task()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File ""/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/locust/user/task.py"", line 373, in execute_next_task
+    self.execute_task(self._task_queue.pop(0))
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/locust/user/task.py"", line 490, in execute_task
+    task(self.user)
+    ~~~~^^^^^^^^^^^
+  File ""/Users/vania/Desktop/juan/icesi/VIII/ingesoftV/talleres/circle-guard-public/performance/locustfile.py"", line 188, in validate_healthy_user
+    with self.client.post(
+         ~~~~~~~~~~~~~~~~^
+        f""{GATEWAY_HOST}/api/v1/gate/validate"",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+        name=""gateway: POST /gate/validate (healthy)"",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ) as resp:
+    ^
+  File ""/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/locust/clients.py"", line 238, in __exit__
+    self.url = self.request_meta[""name""]
+               ~~~~~~~~~~~~~~~~~^^^^^^^^
+",local
