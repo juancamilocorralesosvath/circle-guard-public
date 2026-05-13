@@ -6,23 +6,99 @@
 
 # Test info
 
-- Name: e2e-4-admin-confirms-positive-contacts-notified.spec.ts >> E2E-4: Admin Confirms Positive — RBAC, Cascade & Notification >> E2E-4.4: A circle can be created and the confirmed user can be added as a member
-- Location: e2e/tests/e2e-4-admin-confirms-positive-contacts-notified.spec.ts:173:7
+- Name: e2e-4-admin-confirms-positive-contacts-notified.spec.ts >> E2E-4: Admin Confirms Positive — RBAC, Cascade & Notification >> E2E-4.2: POST /health/confirmed with STUDENT/GATE_STAFF JWT returns 403 (RBAC enforced)
+- Location: e2e/tests/e2e-4-admin-confirms-positive-contacts-notified.spec.ts:113:7
 
 # Error details
 
 ```
-Error: Adding member must return 200 (added) or 409 (already member). Got 400
+Error: A non-HEALTH_CENTER user must be denied /confirmed with 403
 
-expect(received).toContain(expected) // indexOf
+expect(received).toBe(expected) // Object.is equality
 
-Expected value: 400
-Received array: [200, 409]
+Expected: 403
+Received: 500
 ```
 
 # Test source
 
 ```ts
+  24  |  *
+  25  |  * SERVICES UNDER TEST:
+  26  |  *   auth-service → promotion-service (Neo4j cascade + Redis + Kafka)
+  27  |  *   → notification-service (Kafka consumer, mock dispatch)
+  28  |  *
+  29  |  * PREREQUISITES:
+  30  |  *   - "health_user"  has HEALTH_CENTER role (can call /health/confirmed).
+  31  |  *   - "staff_guard"  has STUDENT / GATE_STAFF role (must be denied /health/confirmed).
+  32  |  *   - promotion-service is running with Neo4j and Redis reachable.
+  33  |  *   - notification-service is running in MOCK mode (MOCK_TOKEN env var set).
+  34  |  */
+  35  | 
+  36  | const AUTH_URL      = process.env.AUTH_URL      ?? 'http://localhost:8180';
+  37  | const PROMOTION_URL = process.env.PROMOTION_URL ?? 'http://localhost:8088';
+  38  | 
+  39  | const CASCADE_TIMEOUT_MS = 8_000;
+  40  | const POLL_INTERVAL_MS   = 500;
+  41  | 
+  42  | // ─── Helpers ──────────────────────────────────────────────────────────────────
+  43  | 
+  44  | /** Decode the anonymousId (JWT sub) from a raw JWT string. */
+  45  | function decodeAnonymousId(jwt: string): string {
+  46  |   const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString());
+  47  |   return payload.sub as string;
+  48  | }
+  49  | 
+  50  | /** Sleep for `ms` milliseconds. */
+  51  | const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  52  | 
+  53  | // ─── Test suite ───────────────────────────────────────────────────────────────
+  54  | 
+  55  | test.describe('E2E-4: Admin Confirms Positive — RBAC, Cascade & Notification', () => {
+  56  | 
+  57  |   let api: APIRequestContext;
+  58  | 
+  59  |   // JWTs & IDs resolved in beforeAll
+  60  |   let healthJwt: string;
+  61  |   let studentJwt: string;
+  62  |   let targetAnonymousId: string; // the user who will be confirmed positive
+  63  | 
+  64  |   test.beforeAll(async ({ playwright }) => {
+  65  |     api = await playwright.request.newContext({ ignoreHTTPSErrors: true });
+  66  | 
+  67  |     // --- Health Center admin ---
+  68  |     const healthLogin = await api.post(`${AUTH_URL}/api/v1/auth/login`, {
+  69  |       data: { username: 'health_user', password: 'password' },
+  70  |     });
+  71  |     expect(healthLogin.ok(), 'health_user login must succeed').toBeTruthy();
+  72  |     const healthBody = await healthLogin.json();
+  73  |     healthJwt = healthBody.token;
+  74  | 
+  75  |     // --- Regular student / gate staff ---
+  76  |     const studentLogin = await api.post(`${AUTH_URL}/api/v1/auth/login`, {
+  77  |       data: { username: 'staff_guard', password: 'password' },
+  78  |     });
+  79  |     expect(studentLogin.ok(), 'staff_guard login must succeed').toBeTruthy();
+  80  |     const studentBody = await studentLogin.json();
+  81  |     studentJwt       = studentBody.token;
+  82  |     targetAnonymousId = studentBody.anonymousId; // this user will be "confirmed"
+  83  |   });
+  84  | 
+  85  |   test.afterAll(async () => {
+  86  |     await api.dispose();
+  87  |   });
+  88  | 
+  89  |   // ──────────────────────────────────────────────────────────────────────────
+  90  |   // E2E-4.1  HEALTH_CENTER role can call /health/confirmed → 200
+  91  |   // ──────────────────────────────────────────────────────────────────────────
+  92  |   test(
+  93  |     'E2E-4.1: POST /health/confirmed with HEALTH_CENTER JWT returns 200',
+  94  |     async () => {
+  95  |       const resp = await api.post(`${PROMOTION_URL}/api/v1/health/confirmed`, {
+  96  |         headers: { Authorization: `Bearer ${healthJwt}` },
+  97  |         data:    { anonymousId: targetAnonymousId },
+  98  |       });
+  99  | 
   100 |       // 403 means health_user seed data is missing the HEALTH_CENTER role
   101 |       test.skip(
   102 |         resp.status() === 403,
@@ -47,7 +123,8 @@ Received array: [200, 409]
   121 |       expect(
   122 |         resp.status(),
   123 |         'A non-HEALTH_CENTER user must be denied /confirmed with 403',
-  124 |       ).toBe(403);
+> 124 |       ).toBe(403);
+      |         ^ Error: A non-HEALTH_CENTER user must be denied /confirmed with 403
   125 |     },
   126 |   );
   127 | 
@@ -123,8 +200,7 @@ Received array: [200, 409]
   197 |       expect(
   198 |         [200, 409],
   199 |         `Adding member must return 200 (added) or 409 (already member). Got ${addResp.status()}`,
-> 200 |       ).toContain(addResp.status());
-      |         ^ Error: Adding member must return 200 (added) or 409 (already member). Got 400
+  200 |       ).toContain(addResp.status());
   201 |     },
   202 |   );
   203 | 
@@ -149,8 +225,4 @@ Received array: [200, 409]
   222 |         expect(circle.id,         'Each circle must have an id').toBeTruthy();
   223 |         expect(circle.inviteCode, 'Each circle must have an inviteCode').toBeTruthy();
   224 |       }
-  225 |     },
-  226 |   );
-  227 | });
-  228 | 
 ```
