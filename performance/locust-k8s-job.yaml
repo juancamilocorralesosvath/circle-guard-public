@@ -1,0 +1,124 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: locust-perf-test
+  namespace: circleguard-staging
+  labels:
+    app: locust-perf-test
+    tier: performance
+spec:
+  # Allow up to 3 attempts before marking the Job as failed
+  backoffLimit: 2
+  activeDeadlineSeconds: 1800   # 30 min hard ceiling
+  template:
+    metadata:
+      labels:
+        app: locust-perf-test
+    spec:
+      restartPolicy: OnFailure
+
+      # ── Init container: wait for all microservices to be healthy ────────────
+      initContainers:
+        - name: wait-for-services
+          image: curlimages/curl:8.5.0
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for CircleGuard services to be healthy..."
+              for svc in \
+                "http://circleguard-auth-service:8180/actuator/health/readiness" \
+                "http://circleguard-form-service:8086/actuator/health/readiness" \
+                "http://circleguard-gateway-service:8087/actuator/health/readiness" \
+                "http://circleguard-promotion-service:8088/actuator/health/readiness"; do
+                echo "  Checking $svc ..."
+                until curl -sf "$svc" > /dev/null 2>&1; do
+                  echo "    Not ready yet — retrying in 5 s..."
+                  sleep 5
+                done
+                echo "  ✅  $svc is healthy."
+              done
+              echo "All services healthy. Starting Locust."
+
+      containers:
+        - name: locust
+          image: locustio/locust:2.24.1
+          imagePullPolicy: Always
+          command:
+            - locust
+            - --locustfile=/scripts/locustfile.py
+            - --headless
+            # ── Tier 2 (peak) by default; override via env var ────────────────
+            - --users=$(LOCUST_USERS)
+            - --spawn-rate=$(LOCUST_SPAWN_RATE)
+            - --run-time=$(LOCUST_RUN_TIME)
+            - --host=$(AUTH_HOST)
+            - --html=/results/report.html
+            - --csv=/results/stats
+            - --loglevel=INFO
+          env:
+            # ── Load profile (override to run stress tier) ────────────────────
+            - name: LOCUST_USERS
+              value: "100"
+            - name: LOCUST_SPAWN_RATE
+              value: "10"
+            - name: LOCUST_RUN_TIME
+              value: "5m"
+            # ── Service endpoints (use Kubernetes DNS names) ──────────────────
+            - name: AUTH_HOST
+              value: "http://circleguard-auth-service:8180"
+            - name: FORM_HOST
+              value: "http://circleguard-form-service:8086"
+            - name: GATEWAY_HOST
+              value: "http://circleguard-gateway-service:8087"
+            - name: PROMOTION_HOST
+              value: "http://circleguard-promotion-service:8088"
+            # ── Test credentials (sourced from Kubernetes secret) ─────────────
+            - name: TEST_USER
+              valueFrom:
+                secretKeyRef:
+                  name: circleguard-db-credentials
+                  key: DB_USERNAME
+                  optional: true
+            - name: TEST_PASSWORD
+              value: "password"
+            - name: HC_USER
+              value: "health_user"
+            - name: HC_PASSWORD
+              value: "password"
+          volumeMounts:
+            - name: locust-scripts
+              mountPath: /scripts
+            - name: locust-results
+              mountPath: /results
+          resources:
+            requests:
+              cpu:    "500m"
+              memory: "512Mi"
+            limits:
+              cpu:    "1000m"
+              memory: "1Gi"
+
+      # ── Volumes ───────────────────────────────────────────────────────────────
+      volumes:
+        - name: locust-scripts
+          configMap:
+            name: locust-scripts-config
+        - name: locust-results
+          emptyDir: {}
+
+---
+# ConfigMap that holds the locustfile so it is injected without rebuilding
+# the image.  Update the data.locustfile\.py field with the actual script.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: locust-scripts-config
+  namespace: circleguard-staging
+data:
+  locustfile.py: |
+    # Populated by CI pipeline:
+    #   kubectl create configmap locust-scripts-config \
+    #     --from-file=locustfile.py=performance/locustfile.py \
+    #     -n circleguard-staging --dry-run=client -o yaml | kubectl apply -f -
+    pass
