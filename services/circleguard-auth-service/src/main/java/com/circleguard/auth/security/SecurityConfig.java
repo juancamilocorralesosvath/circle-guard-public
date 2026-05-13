@@ -53,16 +53,16 @@ public class SecurityConfig {
         return builder.build();
     }
 
-    @org.springframework.beans.factory.annotation.Value("${spring.ldap.urls}")
+    @org.springframework.beans.factory.annotation.Value("${spring.ldap.urls:ldap://localhost:389}")
     private String ldapUrls;
 
-    @org.springframework.beans.factory.annotation.Value("${spring.ldap.base}")
+    @org.springframework.beans.factory.annotation.Value("${spring.ldap.base:dc=circleguard,dc=edu}")
     private String ldapBase;
 
-    @org.springframework.beans.factory.annotation.Value("${spring.ldap.username}")
+    @org.springframework.beans.factory.annotation.Value("${spring.ldap.username:cn=admin,dc=circleguard,dc=edu}")
     private String ldapUser;
 
-    @org.springframework.beans.factory.annotation.Value("${spring.ldap.password}")
+    @org.springframework.beans.factory.annotation.Value("${spring.ldap.password:admin}")
     private String ldapPassword;
 
     @Bean
