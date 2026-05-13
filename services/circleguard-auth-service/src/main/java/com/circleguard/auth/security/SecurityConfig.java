@@ -53,13 +53,25 @@ public class SecurityConfig {
         return builder.build();
     }
 
+    @org.springframework.beans.factory.annotation.Value("${spring.ldap.urls}")
+    private String ldapUrls;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.ldap.base}")
+    private String ldapBase;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.ldap.username}")
+    private String ldapUser;
+
+    @org.springframework.beans.factory.annotation.Value("${spring.ldap.password}")
+    private String ldapPassword;
+
     @Bean
     public LdapContextSource contextSource() {
         LdapContextSource contextSource = new LdapContextSource();
-        contextSource.setUrl("ldap://localhost:389");
-        contextSource.setBase("dc=circleguard,dc=edu");
-        contextSource.setUserDn("cn=admin,dc=circleguard,dc=edu");
-        contextSource.setPassword("admin");
+        contextSource.setUrl(ldapUrls);
+        contextSource.setBase(ldapBase);
+        contextSource.setUserDn(ldapUser);
+        contextSource.setPassword(ldapPassword);
         return contextSource;
     }
 
@@ -81,6 +93,6 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(4);
     }
 }
