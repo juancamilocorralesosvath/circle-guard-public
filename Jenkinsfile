@@ -441,9 +441,8 @@ def runSmokeTest(String namespace, String endpoints) {
     withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
         sh """
             export KUBECONFIG=\$KUBECONFIG_FILE
-            kubectl run smoke-${namespace}-${env.BUILD_NUMBER} \
-              --rm --restart=Never \
-              -n ${namespace} --image=curlimages/curl:8.5.0 --timeout=120s -- \
+            kubectl exec -n ${namespace} \
+              deploy/circleguard-gateway-service -- \
               sh -c '${endpoints}'
         """
     }
