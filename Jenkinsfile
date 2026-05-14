@@ -20,7 +20,7 @@ pipeline {
 
     stage('Build & Test') {
       steps {
-        sh './gradlew clean build --no-daemon'
+        sh './gradlew clean build --continue --stacktrace --no-daemon'
         junit allowEmptyResults: true, testResults: '**/build/test-results/**/*.xml'
         archiveArtifacts artifacts: 'services/**/build/libs/*.jar', fingerprint: true, allowEmptyArchive: true
       }
