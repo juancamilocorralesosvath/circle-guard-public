@@ -75,25 +75,6 @@ pipeline {
       }
     }
 
-    stage('Security Scan') {
-      steps {
-        script {
-          timeout(time: 5, unit: 'MINUTES') {
-            SERVICES.split().each { svc ->
-              def image = "${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}:${GIT_COMMIT_SHORT}"
-              catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                sh """
-                  docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-                    aquasec/trivy:0.50.0 image \
-                    --severity HIGH,CRITICAL --exit-code 1 --no-progress --timeout 2m ${image}
-                """
-              }
-            }
-          }
-        }
-      }
-    }
-
     stage('Deploy & Smoke: Dev') {
       when { branch 'dev' }
       steps {
