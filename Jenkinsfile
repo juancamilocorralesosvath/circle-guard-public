@@ -25,17 +25,63 @@ pipeline {
         archiveArtifacts artifacts: 'services/**/build/libs/*.jar', fingerprint: true, allowEmptyArchive: true
       }
       post {
-        always {
-          publishHTML(target: [
-              allowMissing: false,
-              alwaysLinkToLastBuild: true,
-              keepAll: true,
-              reportDir: 'services/circleguard-form-service/build/reports/tests/test',
-              reportFiles: 'index.html',
-              reportName: 'JUnit Report'
-          ])
-        }
-      }
+    always {
+
+        publishHTML(target: [
+            allowMissing: true,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'services/circleguard-auth-service/build/reports/tests/test',
+            reportFiles: 'index.html',
+            reportName: 'Auth Service Test Report'
+        ])
+
+        publishHTML(target: [
+            allowMissing: true,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'services/circleguard-form-service/build/reports/tests/test',
+            reportFiles: 'index.html',
+            reportName: 'Form Service Test Report'
+        ])
+
+        publishHTML(target: [
+            allowMissing: true,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'services/circleguard-gateway-service/build/reports/tests/test',
+            reportFiles: 'index.html',
+            reportName: 'Gateway Service Test Report'
+        ])
+
+        publishHTML(target: [
+            allowMissing: true,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'services/circleguard-identity-service/build/reports/tests/test',
+            reportFiles: 'index.html',
+            reportName: 'Identity Service Test Report'
+        ])
+
+        publishHTML(target: [
+            allowMissing: true,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'services/circleguard-notification-service/build/reports/tests/test',
+            reportFiles: 'index.html',
+            reportName: 'Notification Service Test Report'
+        ])
+
+        publishHTML(target: [
+            allowMissing: true,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'services/circleguard-promotion-service/build/reports/tests/test',
+            reportFiles: 'index.html',
+            reportName: 'Promotion Service Test Report'
+        ])
+    }
+}
     }
 
     stage('Docker Build & Push') {
