@@ -397,7 +397,7 @@ pipeline {
               git config user.name "Jenkins CI"
               git add CHANGELOG.md
               git commit -m "chore: update CHANGELOG for ${env.RELEASE_VERSION} [skip ci]"
-              git push origin HEAD
+              git push origin HEAD:refs/heads/${env.BRANCH_NAME}
             """
           }
           archiveArtifacts artifacts: 'CHANGELOG.md', allowEmptyArchive: true
