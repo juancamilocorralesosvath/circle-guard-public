@@ -357,6 +357,8 @@ pipeline {
           withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_TOKEN')]) {
             sh """
               git remote set-url origin https://\${GIT_USERNAME}:\${GIT_TOKEN}@github.com/juancamilocorralesosvath/circle-guard-public.git
+              git config user.email "jenkins@ci.internal"
+              git config user.name "Jenkins CI"
               git tag -a ${env.RELEASE_VERSION} -m "Release ${env.RELEASE_VERSION} - build ${env.BUILD_NUMBER}, commit ${env.GIT_COMMIT_SHORT}"
               git push origin ${env.RELEASE_VERSION}
             """
