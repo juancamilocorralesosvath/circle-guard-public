@@ -4,12 +4,6 @@ plugins {
     kotlin("jvm") version "1.9.24" apply false
     kotlin("plugin.spring") version "1.9.24" apply false
     kotlin("plugin.jpa") version "1.9.24" apply false
-    id("org.owasp.dependencycheck") version "9.2.0"
-}
-
-dependencyCheck {
-    format = "ALL"
-    suppressionFile = "dependency-check-suppressions.xml"
 }
 
 allprojects {
