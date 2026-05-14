@@ -123,8 +123,9 @@ pipeline {
               POD=$(kubectl get pods -n circleguard-staging -l job-name=circleguard-e2e-tests \
                 -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo '')
               if [ -n "$POD" ]; then
-                kubectl cp circleguard-staging/$POD:/app/test-results/results.xml \
-                  mobile/test-results/e2e-results.xml 2>/dev/null || true
+                kubectl logs -n circleguard-staging "$POD" 2>/dev/null \
+                  | awk 'found; /===JUNIT===/{found=1}' \
+                  > mobile/test-results/e2e-results.xml || true
               fi
               kubectl delete job circleguard-e2e-tests -n circleguard-staging --ignore-not-found=true || true
             '''

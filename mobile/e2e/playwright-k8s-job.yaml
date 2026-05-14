@@ -48,7 +48,10 @@ spec:
               cp /tests/*.spec.ts /app/e2e/tests/
               cd /app
               npm install --no-package-lock @playwright/test@1.52.0
-              npx playwright test
+              npx playwright test; EXIT_CODE=$?
+              printf '\n===JUNIT===\n'
+              cat /app/test-results/results.xml 2>/dev/null || echo '<testsuites/>'
+              exit $EXIT_CODE
           volumeMounts:
             - name: test-files
               mountPath: /tests
