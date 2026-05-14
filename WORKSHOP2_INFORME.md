@@ -67,7 +67,7 @@ docker build \
   -f services/circleguard-${svc}/Dockerfile .
 ```
 
-[IMAGEN: Docker Hub mostrando los repositorios `juanc0410/circleguard-*` con los tags SHA y latest]
+![Dockerhub](screenshots_informe/dockerhub.png)
 
 ### 1.3 Configuración de Kubernetes
 
@@ -102,9 +102,7 @@ kustomize edit set image circleguard-auth-service=\
 
 Los secretos de la plataforma (credenciales de base de datos, claves JWT, VAULT_HASH_SALT) se inyectan como `Secret` de Kubernetes. Un problema detectado durante la configuración fue que el valor `VAULT_HASH_SALT: 12345678` era interpretado como entero por el parser YAML; la solución fue entrecomillar el valor: `VAULT_HASH_SALT: "12345678"`.
 
-[IMAGEN: `kubectl get namespaces` mostrando los tres namespaces de CircleGuard]
-
-[IMAGEN: Árbol de directorios del repositorio mostrando la estructura `k8s/base` y `k8s/overlays`]
+![namespaces](screenshots_informe/namespaces.png)
 
 ---
 
@@ -166,9 +164,10 @@ Los flags utilizados optimizan el tiempo de build:
 - `--build-cache`: reutiliza outputs de compilaciones anteriores no modificadas.
 - `--no-daemon`: evita la acumulación de procesos demonio en el agente CI.
 
-[IMAGEN: Resultado del stage Build & Test en Jenkins mostrando los tests pasando con el reporte JUnit publicado]
+![build & test](screenshots_informe/buildtest.png)
 
-[IMAGEN: HTML Test Reports publicados en Jenkins para al menos uno de los servicios (ej. Promotion Service Test Report)]
+
+![HTML Test Reports](screenshots_informe/reports.png)
 
 #### Stage: Docker Build & Push
 
@@ -196,8 +195,7 @@ stage('Docker Build & Push') {
   }
 }
 ```
-
-[IMAGEN: Stage Docker Build & Push completado exitosamente, mostrando el push de los 6 servicios a Docker Hub]
+![HTML Test Reports](screenshots_informe/buildpush.png)
 
 #### Stage: Deploy & Smoke: Dev
 
@@ -257,9 +255,9 @@ Los servicios se despliegan en paralelo mediante Kustomize, pero el tiempo efect
 
 El promotion-service requirió 2 reinicios antes de estabilizarse, comportamiento esperado dado que Neo4j necesita completar su inicialización antes de que el servicio pueda establecer conexión. Los reinicios son gestionados automáticamente por Kubernetes mediante la política `restartPolicy: Always`.
 
-[IMAGEN: `kubectl get pods -n circleguard-dev` mostrando todos los pods en estado Running 1/1 con los reinicios esperados]
+![pods](screenshots_informe/pods.png)
 
-[IMAGEN: Pipeline de dev completo en Jenkins con todos los stages en verde]
+![pods](screenshots_informe/devpipeline.png)
 
 ---
 
@@ -283,7 +281,6 @@ Esta clase protege la lógica de generación y validación de tokens QR, que son
 
 La criticidad de estas pruebas reside en que el sistema de control de acceso físico (torniquetes, accesos) depende directamente de la validez de estos tokens.
 
-[IMAGEN: Resultado de ejecución de `QrTokenServiceExpiryTest` en el reporte HTML de Gradle mostrando los 5 tests en verde]
 
 #### 3.1.2 `SymptomMapperExtendedTest` (7 pruebas) — form-service
 
@@ -340,7 +337,6 @@ Valida la ventana de aislamiento sanitario, el mecanismo que impide que un usuar
 | `userNotFound_safeHandling` | Un ID de usuario inexistente retorna sin lanzar excepción (fail-safe) |
 | `exceptionMessage_containsExpiry` | El mensaje de la excepción incluye la fecha de expiración de la ventana |
 
-[IMAGEN: Reporte HTML de Gradle del promotion-service mostrando las 6 pruebas de `HealthStatusServiceFenceWindowTest` en verde]
 
 ### 3.2 Pruebas de Integración
 
@@ -417,8 +413,6 @@ Las pruebas de integración validan contratos entre servicios utilizando Testcon
 | `singleUse_tokenInvalidatedAfterUse` | Token de uso único es invalidado tras primera validación |
 | `concurrentValidation_onlyOneSucceeds` | En validación concurrente del mismo token, solo una petición tiene éxito |
 | `freshToken_hasCorrectClaims` | Token contiene `sub`, `iat`, `exp` y `anonymousId` correctamente |
-
-[IMAGEN: Reporte de Gradle mostrando las pruebas de integración de al menos una clase con el número de tests ejecutados, tiempo y resultado]
 
 ### 3.3 Pruebas E2E
 
@@ -565,7 +559,7 @@ La degradación exponencial del login bajo concurrencia apunta a un **cuello de 
 3. Separar el endpoint de autenticación en un servicio dedicado con escalado horizontal independiente.
 4. Configurar `spring.security.ldap.connection-pool=true` y ajustar `com.sun.jndi.ldap.connect.pool.maxsize`.
 
-[IMAGEN: Locust HTML Report mostrando el gráfico de respuestas por tiempo para el tier peak, con el pico visible en POST /login]
+
 
 [IMAGEN: Locust CSV o tabla de resultados del tier stress]
 
@@ -879,19 +873,3 @@ El valor `VAULT_HASH_SALT: 12345678` fue parseado como entero por el parser YAML
 | E2E | Aumentar timeout de cascade a 15s con polling | Reduce flakiness en entornos con recursos limitados |
 | Monitoring | Integrar Prometheus + Grafana | Visibilidad en tiempo real de métricas post-despliegue |
 
-### 6.5 Nota sobre el Video Demostrativo
-
-Este informe va acompañado de un video demostrativo de máximo 8 minutos que muestra en vivo:
-
-1. La ejecución completa del pipeline de desarrollo en Jenkins (rama `dev`).
-2. El pipeline de staging con los resultados de E2E, Performance y Stress Tests.
-3. El pipeline de producción incluyendo la Approval Gate y la generación de Release Notes.
-4. La verificación de los pods desplegados en los tres namespaces mediante `kubectl get pods`.
-5. Un recorrido por los reportes HTML de pruebas y el artefacto `RELEASE_NOTES.md`.
-
-[IMAGEN: Captura del video demostrativo mostrando los tres pipelines en Jenkins con sus stages]
-
----
-
-*Informe generado para Workshop 2 — Ingeniería de Software V — Universidad Icesi*
-*Proyecto: CircleGuard — Plataforma de rastreo de contactos por microservicios*
