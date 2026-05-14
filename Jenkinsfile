@@ -38,45 +38,27 @@ pipeline {
       }
     }
 
-    stage('Generate Release Notes') {
-      when { 
-        anyOf {
-          branch 'master'
-          branch 'main'
-        }
-      }
-      steps {
-        script {
-          echo "Generating Release Notes..."
-          def releaseNotes = sh(script: 'git log --oneline -n 10', returnStdout: true).trim()
-          writeFile file: 'RELEASE_NOTES.md', text: """
-# Release Notes - ${env.BUILD_TAG}
-**Date:** ${new Date().format('yyyy-MM-dd HH:mm:ss')}
-**Commit:** ${env.GIT_COMMIT_SHORT}
-
-## Changes in this version:
-${releaseNotes}
-
----
-Built by Jenkins
-""".trim()
-          archiveArtifacts artifacts: 'RELEASE_NOTES.md'
-        }
-      }
-    }
-
     stage('Docker Build & Push') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_HUB_PASS')]) {
-          sh 'echo "$DOCKER_HUB_PASS" | docker login -u "$DOCKER_HUB_USER" --password-stdin $DOCKER_REGISTRY'
           script {
+            sh 'echo "$DOCKER_HUB_PASS" | docker login -u "$DOCKER_HUB_USER" --password-stdin $DOCKER_REGISTRY'
+            def buildDate = new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC'))
             SERVICES.split().each { svc ->
               def image = "${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}"
               def tag = "${GIT_COMMIT_SHORT}"
-              sh "docker build -t ${image}:${tag} -f services/circleguard-${svc}/Dockerfile ."
-              sh "docker tag ${image}:${tag} ${image}:latest"
-              sh "docker push ${image}:${tag}"
-              sh "docker push ${image}:latest"
+              sh """
+                docker build \
+                  --label "org.opencontainers.image.revision=${GIT_COMMIT_SHORT}" \
+                  --label "org.opencontainers.image.created=${buildDate}" \
+                  --label "org.opencontainers.image.source=https://github.com/${DOCKER_USER}/circle-guard" \
+                  --label "org.opencontainers.image.version=${GIT_COMMIT_SHORT}" \
+                  -t ${image}:${tag} \
+                  -f services/circleguard-${svc}/Dockerfile .
+                docker tag ${image}:${tag} ${image}:latest
+                docker push ${image}:${tag}
+                docker push ${image}:latest
+              """
             }
           }
         }
@@ -86,8 +68,17 @@ Built by Jenkins
     stage('Deploy to Dev') {
       when { branch 'dev' }
       steps {
+        script { deployToEnv('dev', 'circleguard-dev') }
+      }
+    }
+
+    stage('Dev Smoke Tests') {
+      when { branch 'dev' }
+      steps {
         script {
-          deployToEnv('dev', 'circleguard-dev')
+          runSmokeTest('circleguard-dev',
+            'curl -sf http://circleguard-auth-service:8180/actuator/health/readiness && ' +
+            'curl -sf http://circleguard-gateway-service:8087/actuator/health/readiness')
         }
       }
     }
@@ -95,69 +86,316 @@ Built by Jenkins
     stage('Deploy to Stage') {
       when { branch 'staging' }
       steps {
+        script { deployToEnv('staging', 'circleguard-staging') }
+      }
+    }
+
+    stage('Staging Smoke Tests') {
+      when { branch 'staging' }
+      steps {
         script {
-          deployToEnv('staging', 'circleguard-staging')
+          runSmokeTest('circleguard-staging',
+            'curl -sf http://circleguard-auth-service:8180/actuator/health/readiness && ' +
+            'curl -sf http://circleguard-gateway-service:8087/actuator/health/readiness && ' +
+            'curl -sf http://circleguard-form-service:8086/actuator/health/readiness && ' +
+            'curl -sf http://circleguard-promotion-service:8088/actuator/health/readiness')
+        }
+      }
+    }
+
+    stage('E2E Tests') {
+      when { branch 'staging' }
+      steps {
+        withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+          sh '''
+            export KUBECONFIG=$KUBECONFIG_FILE
+            kubectl create configmap e2e-test-files \
+              --from-file=mobile/playwright.config.ts \
+              --from-file=mobile/e2e/tests/ \
+              -n circleguard-staging --dry-run=client -o yaml | kubectl apply -f -
+            kubectl delete job circleguard-e2e-tests -n circleguard-staging --ignore-not-found=true
+            kubectl apply -f mobile/e2e/playwright-k8s-job.yaml
+            kubectl wait --for=condition=complete job/circleguard-e2e-tests \
+              -n circleguard-staging --timeout=600s
+          '''
+        }
+      }
+      post {
+        always {
+          withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+            sh '''
+              export KUBECONFIG=$KUBECONFIG_FILE
+              mkdir -p mobile/test-results
+              POD=$(kubectl get pods -n circleguard-staging -l job-name=circleguard-e2e-tests \
+                -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo '')
+              if [ -n "$POD" ]; then
+                kubectl cp circleguard-staging/$POD:/app/test-results/results.xml \
+                  mobile/test-results/e2e-results.xml 2>/dev/null || true
+              fi
+              kubectl delete job circleguard-e2e-tests -n circleguard-staging --ignore-not-found=true || true
+            '''
+          }
+          junit allowEmptyResults: true, testResults: 'mobile/test-results/e2e-results.xml'
+        }
+      }
+    }
+
+    stage('Performance Tests') {
+      when { branch 'staging' }
+      steps {
+        withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+          sh '''
+            export KUBECONFIG=$KUBECONFIG_FILE
+            kubectl create configmap locust-scripts-config \
+              --from-file=locustfile.py=performance/locustfile.py \
+              -n circleguard-staging --dry-run=client -o yaml | kubectl apply -f -
+            kubectl delete job locust-perf-test -n circleguard-staging --ignore-not-found=true
+            kubectl apply -f performance/locust-k8s-job.yaml
+            kubectl wait --for=condition=complete job/locust-perf-test \
+              -n circleguard-staging --timeout=900s
+          '''
+        }
+      }
+      post {
+        always {
+          withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+            sh '''
+              export KUBECONFIG=$KUBECONFIG_FILE
+              mkdir -p performance/results/peak
+              POD=$(kubectl get pods -n circleguard-staging -l job-name=locust-perf-test \
+                -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo '')
+              if [ -n "$POD" ]; then
+                kubectl cp circleguard-staging/$POD:/results/report.html \
+                  performance/results/peak/report.html 2>/dev/null || true
+                kubectl cp circleguard-staging/$POD:/results/stats_stats.csv \
+                  performance/results/peak/stats_stats.csv 2>/dev/null || true
+                kubectl cp circleguard-staging/$POD:/results/stats_failures.csv \
+                  performance/results/peak/stats_failures.csv 2>/dev/null || true
+              fi
+              kubectl delete job locust-perf-test -n circleguard-staging --ignore-not-found=true || true
+            '''
+          }
+          publishHTML(target: [
+            allowMissing: true,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'performance/results/peak',
+            reportFiles: 'report.html',
+            reportName: 'Locust Peak Load Report'
+          ])
+          archiveArtifacts artifacts: 'performance/results/**/*.csv', allowEmptyArchive: true
+        }
+      }
+    }
+
+    stage('Stress Tests') {
+      when { branch 'staging' }
+      steps {
+        withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+          sh '''
+            export KUBECONFIG=$KUBECONFIG_FILE
+            kubectl delete job locust-stress-test -n circleguard-staging --ignore-not-found=true
+            kubectl apply -f performance/locust-k8s-stress-job.yaml
+            kubectl wait --for=condition=complete job/locust-stress-test \
+              -n circleguard-staging --timeout=900s || true
+          '''
+        }
+      }
+      post {
+        always {
+          withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+            sh '''
+              export KUBECONFIG=$KUBECONFIG_FILE
+              mkdir -p performance/results/stress
+              POD=$(kubectl get pods -n circleguard-staging -l job-name=locust-stress-test \
+                -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo '')
+              if [ -n "$POD" ]; then
+                kubectl cp circleguard-staging/$POD:/results/stress-report.html \
+                  performance/results/stress/report.html 2>/dev/null || true
+              fi
+              kubectl delete job locust-stress-test -n circleguard-staging --ignore-not-found=true || true
+            '''
+          }
+          publishHTML(target: [
+            allowMissing: true,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'performance/results/stress',
+            reportFiles: 'report.html',
+            reportName: 'Locust Stress Report'
+          ])
+        }
+      }
+    }
+
+    stage('Validate Staging Promotion') {
+      when { anyOf { branch 'master'; branch 'main' } }
+      steps {
+        withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+          sh """
+            export KUBECONFIG=\$KUBECONFIG_FILE
+            STAGING_IMAGE=\$(kubectl get deployment/circleguard-auth-service -n circleguard-staging \
+              -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo 'unknown')
+            if echo "\$STAGING_IMAGE" | grep -q '${GIT_COMMIT_SHORT}'; then
+              echo "PASS: commit ${GIT_COMMIT_SHORT} is deployed to staging."
+            else
+              echo "FAIL: staging is running '\$STAGING_IMAGE', expected commit ${GIT_COMMIT_SHORT}."
+              exit 1
+            fi
+          """
+        }
+      }
+    }
+
+    stage('Approval Gate') {
+      when { anyOf { branch 'master'; branch 'main' } }
+      steps {
+        timeout(time: 30, unit: 'MINUTES') {
+          input message: "Deploy commit ${GIT_COMMIT_SHORT} to production?",
+                submitter: 'admin,devops-lead,release-manager',
+                ok: 'Approve and Deploy'
+        }
+      }
+    }
+
+    stage('Generate Release Notes') {
+      when { anyOf { branch 'master'; branch 'main' } }
+      steps {
+        script {
+          env.RELEASE_VERSION = "v${new Date().format('yyyy.MM.dd')}-${env.BUILD_NUMBER}"
+          def lastTag = sh(script: 'git describe --tags --abbrev=0 2>/dev/null || echo ""', returnStdout: true).trim()
+          def logRange = lastTag ? "${lastTag}..HEAD" : '--max-count=20'
+          def releaseNotes = sh(script: "git log ${logRange} --oneline --no-merges", returnStdout: true).trim()
+          def since = lastTag ?: 'beginning of project'
+          def notes = "# Release ${env.RELEASE_VERSION}\n\n" +
+                      "**Date:** ${new Date().format('yyyy-MM-dd HH:mm:ss')}\n" +
+                      "**Commit:** ${env.GIT_COMMIT_SHORT}\n" +
+                      "**Pipeline:** ${env.BUILD_TAG}\n\n" +
+                      "## Changes since ${since}:\n" +
+                      "${releaseNotes}\n\n" +
+                      "---\nBuilt by Jenkins"
+          writeFile file: 'RELEASE_NOTES.md', text: notes
+          archiveArtifacts artifacts: 'RELEASE_NOTES.md'
         }
       }
     }
 
     stage('Deploy to Production') {
-      when { 
-        anyOf {
-          branch 'master'
-          branch 'main'
-        }
+      when { anyOf { branch 'master'; branch 'main' } }
+      steps {
+        script { deployToEnv('prod', 'circleguard-prod') }
       }
+    }
+
+    stage('Production Smoke Tests') {
+      when { anyOf { branch 'master'; branch 'main' } }
       steps {
         script {
-          // Point 5: Mandatory validation of system tests could be added here
-          deployToEnv('prod', 'circleguard-prod')
+          runSmokeTest('circleguard-prod',
+            'curl -sf http://circleguard-auth-service:8180/actuator/health/readiness && ' +
+            'curl -sf http://circleguard-gateway-service:8087/actuator/health/readiness')
         }
       }
     }
 
-    stage('Smoke Tests') {
+    stage('Tag Release') {
+      when { anyOf { branch 'master'; branch 'main' } }
       steps {
         script {
-          def targetNs = (env.BRANCH_NAME == 'dev') ? 'circleguard-dev' : (env.BRANCH_NAME == 'staging' ? 'circleguard-staging' : 'circleguard-prod')
-          try {
-            echo "Running smoke checks in ${targetNs}"
-            withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
-              sh 'export KUBECONFIG=$KUBECONFIG_FILE'
-              sh "kubectl run --rm -i --restart=Never smoke-curl -n ${targetNs} --image=radial/busyboxplus:curl -- sh -c \"curl -sS http://circleguard-auth-service:8180/actuator/health/readiness\""
+          sshagent(['github-ssh-key']) {
+            sh """
+              git tag -a ${env.RELEASE_VERSION} -m "Release ${env.RELEASE_VERSION} - build ${env.BUILD_NUMBER}, commit ${env.GIT_COMMIT_SHORT}"
+              git push origin ${env.RELEASE_VERSION}
+            """
+          }
+          withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_HUB_PASS')]) {
+            sh 'echo "$DOCKER_HUB_PASS" | docker login -u "$DOCKER_HUB_USER" --password-stdin $DOCKER_REGISTRY'
+            SERVICES.split().each { svc ->
+              def image = "${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}"
+              sh """
+                docker tag ${image}:${GIT_COMMIT_SHORT} ${image}:${env.RELEASE_VERSION}
+                docker push ${image}:${env.RELEASE_VERSION}
+              """
             }
-          } catch (Exception e) {
-            echo "Smoke tests skipped or failed: ${e.message}"
           }
         }
       }
     }
+
+    stage('Archive Release Metadata') {
+      when { anyOf { branch 'master'; branch 'main' } }
+      steps {
+        script {
+          def lastTag = sh(script: "git describe --tags --abbrev=0 ${env.RELEASE_VERSION}^ 2>/dev/null || echo ''", returnStdout: true).trim()
+          def logRange = lastTag ? "${lastTag}..${env.RELEASE_VERSION}" : "${env.RELEASE_VERSION}"
+          def changelog = sh(script: "git log ${logRange} --oneline --no-merges", returnStdout: true).trim()
+          def today = new Date().format('yyyy-MM-dd')
+          def existing = fileExists('CHANGELOG.md') ? readFile('CHANGELOG.md') : ''
+          writeFile file: 'CHANGELOG.md', text: "## ${env.RELEASE_VERSION} (${today})\n\n${changelog}\n\n${existing}"
+          sshagent(['github-ssh-key']) {
+            sh """
+              git config user.email "jenkins@ci.internal"
+              git config user.name "Jenkins CI"
+              git add CHANGELOG.md
+              git commit -m "chore: update CHANGELOG for ${env.RELEASE_VERSION} [skip ci]"
+              git push origin HEAD
+            """
+          }
+          archiveArtifacts artifacts: 'CHANGELOG.md', allowEmptyArchive: true
+        }
+      }
+    }
   }
+
   post {
     failure {
-      echo 'Pipeline failed — check logs and consider running rollback steps from CI_CD_RUNBOOK.md'
+      echo 'Pipeline failed - check logs and consider running rollback steps from CI_CD_RUNBOOK.md'
     }
   }
 }
 
 def deployToEnv(String overlay, String namespace) {
     echo "Deploying to ${overlay} overlay in namespace ${namespace}"
-    try {
-      withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+    withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+        try {
+            sh """
+                export KUBECONFIG=\$KUBECONFIG_FILE
+                kubectl create namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -
+                KUST_TMP=\$(mktemp -d)
+                cp -r k8s "\$KUST_TMP/"
+                cd "\$KUST_TMP/k8s/overlays/${overlay}"
+                ${SERVICES.split().collect { svc -> "kustomize edit set image circleguard-${svc}=${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}:${GIT_COMMIT_SHORT}" }.join("\n                ")}
+                kustomize build . | kubectl apply -f -
+                rm -rf "\$KUST_TMP"
+            """
+            sh """
+                export KUBECONFIG=\$KUBECONFIG_FILE
+                ${SERVICES.split().collect { svc -> "kubectl rollout status deployment/circleguard-${svc} -n ${namespace} --timeout=300s" }.join("\n                ")}
+            """
+            sh """
+                export KUBECONFIG=\$KUBECONFIG_FILE
+                ${SERVICES.split().collect { svc -> "kubectl wait --for=condition=available deployment/circleguard-${svc} -n ${namespace} --timeout=60s" }.join("\n                ")}
+            """
+        } catch (Exception e) {
+            echo "Deployment to ${overlay} failed: ${e.message}. Initiating rollback..."
+            // || true: non-fatal — rollback may not exist on a first-ever deployment
+            sh """
+                export KUBECONFIG=\$KUBECONFIG_FILE
+                ${SERVICES.split().collect { svc -> "kubectl rollout undo deployment/circleguard-${svc} -n ${namespace} || true" }.join("\n                ")}
+            """
+            error "Deployment to ${overlay} failed and has been rolled back."
+        }
+    }
+}
+
+def runSmokeTest(String namespace, String endpoints) {
+    withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
         sh """
-          export KUBECONFIG=${KUBECONFIG_FILE}
-          kubectl create namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -
-          
-          cd k8s/overlays/${overlay}
-          ${SERVICES.split().collect { svc -> "kustomize edit set image circleguard-${svc}=${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}:${GIT_COMMIT_SHORT}" }.join("\n          ")}
-          
-          kustomize build . | kubectl apply -f -
-          
-          ${SERVICES.split().collect { svc -> "kubectl rollout status deployment/circleguard-${svc} -n ${namespace} --timeout=180s" }.join("\n          ")}
+            export KUBECONFIG=\$KUBECONFIG_FILE
+            kubectl run smoke-${namespace}-${env.BUILD_NUMBER} \
+              --rm --restart=Never \
+              -n ${namespace} --image=curlimages/curl:8.5.0 --timeout=120s -- \
+              sh -c '${endpoints}'
         """
-      }
-    } catch (Exception e) {
-      echo "Deployment to ${overlay} failed: ${e.message}"
-      error "Deployment stage failed."
     }
 }

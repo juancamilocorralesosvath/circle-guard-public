@@ -1,0 +1,69 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: circleguard-e2e-tests
+  namespace: circleguard-staging
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        - name: wait-for-services
+          image: curlimages/curl:8.5.0
+          command:
+            - sh
+            - -c
+            - |
+              for svc in \
+                "http://circleguard-auth-service:8180/actuator/health/readiness" \
+                "http://circleguard-form-service:8086/actuator/health/readiness" \
+                "http://circleguard-gateway-service:8087/actuator/health/readiness" \
+                "http://circleguard-promotion-service:8088/actuator/health/readiness"; do
+                until curl -sf "$svc" > /dev/null 2>&1; do sleep 5; done
+              done
+      containers:
+        - name: playwright
+          image: node:20-alpine
+          env:
+            - name: PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD
+              value: "1"
+            - name: CI
+              value: "true"
+            - name: AUTH_URL
+              value: http://circleguard-auth-service:8180
+            - name: FORM_URL
+              value: http://circleguard-form-service:8086
+            - name: GATEWAY_URL
+              value: http://circleguard-gateway-service:8087
+            - name: PROMOTION_URL
+              value: http://circleguard-promotion-service:8088
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /app/e2e/tests /app/test-results
+              cp /tests/playwright.config.ts /app/
+              cp /tests/*.spec.ts /app/e2e/tests/
+              cd /app
+              npm install --no-package-lock @playwright/test@1.52.0
+              npx playwright test
+          volumeMounts:
+            - name: test-files
+              mountPath: /tests
+            - name: results
+              mountPath: /app/test-results
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: test-files
+          configMap:
+            name: e2e-test-files
+        - name: results
+          emptyDir: {}

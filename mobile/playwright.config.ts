@@ -12,7 +12,7 @@ export default defineConfig({
   timeout: 60000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: 'list',
+  reporter: [['list'], ['junit', { outputFile: 'test-results/results.xml' }]],
   use: {
     trace: 'on-first-retry',
   },
