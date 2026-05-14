@@ -415,13 +415,6 @@ def deployToEnv(String overlay, String namespace) {
                 export KUBECONFIG=\$KUBECONFIG_FILE
                 ${SERVICES.split().collect { svc -> "kubectl wait --for=condition=available deployment/circleguard-${svc} -n ${namespace} --timeout=60s" }.join("\n                ")}
             """
-            sh """
-                export KUBECONFIG=\$KUBECONFIG_FILE
-                kubectl run readiness-check-${env.BUILD_NUMBER} \
-                  --rm --restart=Never \
-                  -n ${namespace} --image=curlimages/curl:8.5.0 --timeout=60s -- \
-                  sh -c 'curl -f --connect-timeout 5 --max-time 10 http://circleguard-auth-service:8180/actuator/health/readiness && curl -f --connect-timeout 5 --max-time 10 http://circleguard-gateway-service:8087/actuator/health/readiness && curl -f --connect-timeout 5 --max-time 10 http://circleguard-form-service:8086/actuator/health/readiness && curl -f --connect-timeout 5 --max-time 10 http://circleguard-promotion-service:8088/actuator/health/readiness'
-            """
         } catch (Exception e) {
             echo "Deployment to ${overlay} failed: ${e.message}. Initiating rollback..."
             sh """
