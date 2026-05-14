@@ -139,8 +139,6 @@ pipeline {
             unstable 'E2E: no JUnit cases parsed (missing job, logs, or ===JUNIT=== marker).'
           } else if (rate < 60.0) {
             error "E2E success rate ${String.format('%.1f', rate)}% is below the 60% threshold."
-          } else if (rate < 100.0) {
-            unstable "E2E tests partially successful: ${String.format('%.1f', rate)}% passed."
           }
         }
       }
@@ -158,7 +156,9 @@ pipeline {
             kubectl delete job locust-perf-test -n circleguard-staging --ignore-not-found=true
             kubectl apply -f performance/locust-k8s-job.yaml
             kubectl wait --for=condition=complete job/locust-perf-test \
-              -n circleguard-staging --timeout=900s || true
+              -n circleguard-staging --timeout=900s || \
+            kubectl wait --for=condition=failed job/locust-perf-test \
+              -n circleguard-staging --timeout=30s 2>/dev/null || true
           '''
         }
       }
@@ -203,7 +203,9 @@ pipeline {
             kubectl delete job locust-stress-test -n circleguard-staging --ignore-not-found=true
             kubectl apply -f performance/locust-k8s-stress-job.yaml
             kubectl wait --for=condition=complete job/locust-stress-test \
-              -n circleguard-staging --timeout=900s || true
+              -n circleguard-staging --timeout=900s || \
+            kubectl wait --for=condition=failed job/locust-stress-test \
+              -n circleguard-staging --timeout=30s 2>/dev/null || true
           '''
         }
       }

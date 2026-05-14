@@ -7,8 +7,7 @@ metadata:
     app: locust-perf-test
     tier: performance
 spec:
-  # Allow up to 3 attempts before marking the Job as failed
-  backoffLimit: 2
+  backoffLimit: 0
   activeDeadlineSeconds: 1800   # 30 min hard ceiling
   template:
     metadata:
