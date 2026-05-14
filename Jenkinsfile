@@ -229,26 +229,36 @@ pipeline {
     }
 
     stage('Validate Staging Promotion') {
-      when { anyOf { branch 'master'; branch 'main' } }
+      when {
+        anyOf { branch 'master'; branch 'main' }
+        not { changelog '.*\\[skip ci\\].*' }
+      }
       steps {
         withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
           sh """
             export KUBECONFIG=\$KUBECONFIG_FILE
-            STAGING_IMAGE=\$(kubectl get deployment/circleguard-auth-service -n circleguard-staging \
-              -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo 'unknown')
-            if echo "\$STAGING_IMAGE" | grep -q '${GIT_COMMIT_SHORT}'; then
-              echo "PASS: commit ${GIT_COMMIT_SHORT} is deployed to staging."
-            else
-              echo "FAIL: staging is running '\$STAGING_IMAGE', expected commit ${GIT_COMMIT_SHORT}."
-              exit 1
-            fi
+            FAILED=0
+            for svc in auth-service identity-service form-service promotion-service gateway-service notification-service; do
+              IMG=\$(kubectl get deployment/circleguard-\$svc -n circleguard-staging \
+                -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo 'unknown')
+              if echo "\$IMG" | grep -q '${GIT_COMMIT_SHORT}'; then
+                echo "PASS: circleguard-\$svc is on commit ${GIT_COMMIT_SHORT}."
+              else
+                echo "FAIL: circleguard-\$svc is running '\$IMG', expected commit ${GIT_COMMIT_SHORT}."
+                FAILED=1
+              fi
+            done
+            exit \$FAILED
           """
         }
       }
     }
 
     stage('Approval Gate') {
-      when { anyOf { branch 'master'; branch 'main' } }
+      when {
+        anyOf { branch 'master'; branch 'main' }
+        not { changelog '.*\\[skip ci\\].*' }
+      }
       steps {
         timeout(time: 30, unit: 'MINUTES') {
           input message: "Deploy commit ${GIT_COMMIT_SHORT} to production?",
@@ -259,7 +269,10 @@ pipeline {
     }
 
     stage('Generate Release Notes') {
-      when { anyOf { branch 'master'; branch 'main' } }
+      when {
+        anyOf { branch 'master'; branch 'main' }
+        not { changelog '.*\\[skip ci\\].*' }
+      }
       steps {
         script {
           env.RELEASE_VERSION = "v${new Date().format('yyyy.MM.dd')}-${env.BUILD_NUMBER}"
@@ -281,25 +294,36 @@ pipeline {
     }
 
     stage('Deploy to Production') {
-      when { anyOf { branch 'master'; branch 'main' } }
+      when {
+        anyOf { branch 'master'; branch 'main' }
+        not { changelog '.*\\[skip ci\\].*' }
+      }
       steps {
         script { deployToEnv('prod', 'circleguard-prod') }
       }
     }
 
     stage('Production Smoke Tests') {
-      when { anyOf { branch 'master'; branch 'main' } }
+      when {
+        anyOf { branch 'master'; branch 'main' }
+        not { changelog '.*\\[skip ci\\].*' }
+      }
       steps {
         script {
           runSmokeTest('circleguard-prod',
             'curl -sf http://circleguard-auth-service:8180/actuator/health/readiness && ' +
-            'curl -sf http://circleguard-gateway-service:8087/actuator/health/readiness')
+            'curl -sf http://circleguard-gateway-service:8087/actuator/health/readiness && ' +
+            'curl -sf http://circleguard-form-service:8086/actuator/health/readiness && ' +
+            'curl -sf http://circleguard-promotion-service:8088/actuator/health/readiness')
         }
       }
     }
 
     stage('Tag Release') {
-      when { anyOf { branch 'master'; branch 'main' } }
+      when {
+        anyOf { branch 'master'; branch 'main' }
+        not { changelog '.*\\[skip ci\\].*' }
+      }
       steps {
         script {
           sshagent(['github-ssh-key']) {
@@ -323,7 +347,10 @@ pipeline {
     }
 
     stage('Archive Release Metadata') {
-      when { anyOf { branch 'master'; branch 'main' } }
+      when {
+        anyOf { branch 'master'; branch 'main' }
+        not { changelog '.*\\[skip ci\\].*' }
+      }
       steps {
         script {
           def lastTag = sh(script: "git describe --tags --abbrev=0 ${env.RELEASE_VERSION}^ 2>/dev/null || echo ''", returnStdout: true).trim()
@@ -369,10 +396,12 @@ def deployToEnv(String overlay, String namespace) {
                 rm -rf "\$KUST_TMP"
             """
             sh """
+                set -e
                 export KUBECONFIG=\$KUBECONFIG_FILE
                 ${SERVICES.split().collect { svc -> "kubectl rollout status deployment/circleguard-${svc} -n ${namespace} --timeout=300s" }.join("\n                ")}
             """
             sh """
+                set -e
                 export KUBECONFIG=\$KUBECONFIG_FILE
                 ${SERVICES.split().collect { svc -> "kubectl wait --for=condition=available deployment/circleguard-${svc} -n ${namespace} --timeout=60s" }.join("\n                ")}
             """
