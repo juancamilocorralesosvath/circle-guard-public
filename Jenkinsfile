@@ -245,6 +245,20 @@ pipeline {
       }
     }
 
+    stage('Deploy to Staging') {
+      when {
+        anyOf { branch 'master'; branch 'main' }
+        not { changelog '.*\\[skip ci\\].*' }
+      }
+      steps {
+        script {
+          deployToEnv('staging', 'circleguard-staging')
+          runSmokeTest('circleguard-staging',
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-gateway-service:8087/actuator/health/readiness')
+        }
+      }
+    }
+
     stage('Validate Staging Promotion') {
       when {
         anyOf { branch 'master'; branch 'main' }
