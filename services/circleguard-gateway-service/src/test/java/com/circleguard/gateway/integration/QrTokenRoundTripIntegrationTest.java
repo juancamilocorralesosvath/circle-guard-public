@@ -158,7 +158,7 @@ class QrTokenRoundTripIntegrationTest {
     void gate_ReadsRedisKey_ForSubjectAnonymousId() throws Exception {
         String anonymousId = UUID.randomUUID().toString();
         // Simulate promotion-service writing SUSPECT to Redis
-        redisTemplate.opsForValue().set("user:status:" + anonymousId, "CONTAGIED");
+        redisTemplate.opsForValue().set("user:status:" + anonymousId, "SUSPECT");
 
         String token = validToken(anonymousId);
 

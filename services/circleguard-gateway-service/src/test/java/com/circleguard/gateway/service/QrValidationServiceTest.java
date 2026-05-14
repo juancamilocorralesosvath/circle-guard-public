@@ -50,7 +50,7 @@ public class QrValidationServiceTest {
     }
 
     @Test
-    void shouldDenyAccessForContagiedUser() {
+    void shouldDenyAccessForSuspectUser() {
         String anonymousId = UUID.randomUUID().toString();
         Key key = Keys.hmacShaKeyFor(secret.getBytes());
         String token = Jwts.builder()
@@ -58,7 +58,7 @@ public class QrValidationServiceTest {
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
 
-        Mockito.when(valueOps.get("user:status:" + anonymousId)).thenReturn("CONTAGIED");
+        Mockito.when(valueOps.get("user:status:" + anonymousId)).thenReturn("SUSPECT");
 
         QrValidationService.ValidationResult result = service.validateToken(token);
         

@@ -37,11 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * WHAT IS VALIDATED:
  *   1. No Redis key for user → gate returns GREEN (ACTIVE user with no record).
- *   2. Redis key "user:status:{id}" = "SUSPECT" → gate returns RED.
- *   3. Redis key = "CONFIRMED" → gate returns RED.
- *   4. Redis key = "ACTIVE" / "CLEAR" / unknown string → gate returns GREEN.
- *   5. Expired QR token → gate returns RED regardless of Redis status.
- *   6. Malformed token (not a JWT) → gate returns RED.
+ *   2. Redis key "user:status:{id}" = "SUSPECT" / "PROBABLE" / "CONFIRMED" → gate returns RED.
+ *   3. Redis key = "ACTIVE" / "CLEAR" / unknown string → gate returns GREEN.
  *
  * APPROACH:
  *   - Redis Testcontainer shared between both service contexts.
@@ -137,7 +134,7 @@ class RedisStatusSharingIntegrationTest {
     void suspectStatus_InRedis_ReturnsRed() throws Exception {
         String anonymousId = UUID.randomUUID().toString();
         // Simulate what promotion-service writes after status cascade
-        redisTemplate.opsForValue().set(STATUS_PREFIX + anonymousId, "CONTAGIED");
+        redisTemplate.opsForValue().set(STATUS_PREFIX + anonymousId, "SUSPECT");
 
         String token = generateQrToken(anonymousId);
 
@@ -151,13 +148,13 @@ class RedisStatusSharingIntegrationTest {
     }
 
     /**
-     * IT-3.3 — Redis key = "POTENTIAL" → RED access denied
+     * IT-3.3 — Redis key = "PROBABLE" → RED access denied
      */
     @Test
-    @DisplayName("IT-3.3: User with Redis status POTENTIAL gets RED (probable/suspect)")
-    void potentialStatus_InRedis_ReturnsRed() throws Exception {
+    @DisplayName("IT-3.3: User with Redis status PROBABLE gets RED (second-hop exposure)")
+    void probableStatus_InRedis_ReturnsRed() throws Exception {
         String anonymousId = UUID.randomUUID().toString();
-        redisTemplate.opsForValue().set(STATUS_PREFIX + anonymousId, "POTENTIAL");
+        redisTemplate.opsForValue().set(STATUS_PREFIX + anonymousId, "PROBABLE");
 
         String token = generateQrToken(anonymousId);
 
