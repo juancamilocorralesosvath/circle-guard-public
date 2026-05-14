@@ -377,9 +377,9 @@ pipeline {
       }
       steps {
         script {
-          sshagent(['github-ssh-key']) {
+          withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_TOKEN')]) {
             sh """
-              git remote set-url origin git@github.com:juancamilocorralesosvath/circle-guard-public.git
+              git remote set-url origin https://\${GIT_USERNAME}:\${GIT_TOKEN}@github.com/juancamilocorralesosvath/circle-guard-public.git
               git tag -a ${env.RELEASE_VERSION} -m "Release ${env.RELEASE_VERSION} - build ${env.BUILD_NUMBER}, commit ${env.GIT_COMMIT_SHORT}"
               git push origin ${env.RELEASE_VERSION}
             """
@@ -411,9 +411,9 @@ pipeline {
           def today = new Date().format('yyyy-MM-dd')
           def existing = fileExists('CHANGELOG.md') ? readFile('CHANGELOG.md') : ''
           writeFile file: 'CHANGELOG.md', text: "## ${env.RELEASE_VERSION} (${today})\n\n${changelog}\n\n${existing}"
-          sshagent(['github-ssh-key']) {
+          withCredentials([usernamePassword(credentialsId: 'github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_TOKEN')]) {
             sh """
-              git remote set-url origin git@github.com:juancamilocorralesosvath/circle-guard-public.git
+              git remote set-url origin https://\${GIT_USERNAME}:\${GIT_TOKEN}@github.com/juancamilocorralesosvath/circle-guard-public.git
               git config user.email "jenkins@ci.internal"
               git config user.name "Jenkins CI"
               git add CHANGELOG.md
