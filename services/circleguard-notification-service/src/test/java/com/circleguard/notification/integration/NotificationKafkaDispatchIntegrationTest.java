@@ -49,7 +49,10 @@ import static org.mockito.Mockito.*;
 @EmbeddedKafka(
         partitions = 1,
         topics = {"promotion.status.changed"},
-        brokerProperties = {"auto.create.topics.enable=true"}
+        brokerProperties = {
+            "auto.create.topics.enable=true",
+            "group.initial.rebalance.delay.ms=0"
+        }
 )
 class NotificationKafkaDispatchIntegrationTest {
 

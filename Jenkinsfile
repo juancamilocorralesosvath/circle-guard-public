@@ -128,7 +128,12 @@ pipeline {
               kubectl delete job circleguard-e2e-tests -n circleguard-staging --ignore-not-found=true || true
             '''
           }
-          def results = junit(allowEmptyResults: true, testResults: 'mobile/test-results/e2e-results.xml')
+          // Still publish E2E results to Jenkins, but only the Groovy gate below decides FAILURE;
+          // otherwise junit() marks UNSTABLE whenever any case fails (e.g. 24/26 passed).
+          def results = junit(
+            allowEmptyResults: true,
+            skipMarkingBuildUnstable: true,
+            testResults: 'mobile/test-results/e2e-results.xml')
           def total   = results.totalCount
           def failed  = results.failCount
           def skipped = results.skipCount
