@@ -65,6 +65,53 @@ pipeline {
       }
     }
 
+    stage('Security Scan') {
+      steps {
+        script {
+          def onMain = env.BRANCH_NAME in ['main', 'master']
+          def trivyExit = onMain ? 1 : 0
+
+          SERVICES.split().each { svc ->
+            def image = "${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}:${GIT_COMMIT_SHORT}"
+            def rc = sh(returnStatus: true, script: """
+              docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+                aquasec/trivy:latest image \
+                --severity HIGH,CRITICAL --exit-code ${trivyExit} --no-progress ${image}
+            """)
+            if (rc != 0) {
+              if (onMain) {
+                error "Trivy: HIGH/CRITICAL vulnerabilities in ${image} — blocking deploy."
+              } else {
+                unstable "Trivy: vulnerabilities found in ${image} — build marked unstable."
+              }
+            }
+          }
+
+          def owaspRc = sh(returnStatus: true, script: './gradlew dependencyCheckAggregate --no-daemon')
+          if (owaspRc != 0) {
+            if (onMain) {
+              error 'OWASP Dependency Check: HIGH/CRITICAL vulnerabilities found.'
+            } else {
+              unstable 'OWASP Dependency Check: vulnerabilities found — build marked unstable.'
+            }
+          }
+        }
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'build/reports/dependency-check-report.*', allowEmptyArchive: true
+          publishHTML(target: [
+            allowMissing: true,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'build/reports',
+            reportFiles: 'dependency-check-report.html',
+            reportName: 'OWASP Dependency Report'
+          ])
+        }
+      }
+    }
+
     stage('Deploy to Dev') {
       when { branch 'dev' }
       steps {
@@ -77,8 +124,8 @@ pipeline {
       steps {
         script {
           runSmokeTest('circleguard-dev',
-            'curl -sf http://circleguard-auth-service:8180/actuator/health/readiness && ' +
-            'curl -sf http://circleguard-gateway-service:8087/actuator/health/readiness')
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-auth-service:8180/actuator/health/readiness && ' +
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-gateway-service:8087/actuator/health/readiness')
         }
       }
     }
@@ -95,10 +142,10 @@ pipeline {
       steps {
         script {
           runSmokeTest('circleguard-staging',
-            'curl -sf http://circleguard-auth-service:8180/actuator/health/readiness && ' +
-            'curl -sf http://circleguard-gateway-service:8087/actuator/health/readiness && ' +
-            'curl -sf http://circleguard-form-service:8086/actuator/health/readiness && ' +
-            'curl -sf http://circleguard-promotion-service:8088/actuator/health/readiness')
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-auth-service:8180/actuator/health/readiness && ' +
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-gateway-service:8087/actuator/health/readiness && ' +
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-form-service:8086/actuator/health/readiness && ' +
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-promotion-service:8088/actuator/health/readiness')
         }
       }
     }
@@ -212,6 +259,10 @@ pipeline {
               if [ -n "$POD" ]; then
                 kubectl cp circleguard-staging/$POD:/results/stress-report.html \
                   performance/results/stress/report.html 2>/dev/null || true
+                kubectl cp circleguard-staging/$POD:/results/stress-stats_stats.csv \
+                  performance/results/stress/stress-stats_stats.csv 2>/dev/null || true
+                kubectl cp circleguard-staging/$POD:/results/stress-stats_failures.csv \
+                  performance/results/stress/stress-stats_failures.csv 2>/dev/null || true
               fi
               kubectl delete job locust-stress-test -n circleguard-staging --ignore-not-found=true || true
             '''
@@ -311,10 +362,10 @@ pipeline {
       steps {
         script {
           runSmokeTest('circleguard-prod',
-            'curl -sf http://circleguard-auth-service:8180/actuator/health/readiness && ' +
-            'curl -sf http://circleguard-gateway-service:8087/actuator/health/readiness && ' +
-            'curl -sf http://circleguard-form-service:8086/actuator/health/readiness && ' +
-            'curl -sf http://circleguard-promotion-service:8088/actuator/health/readiness')
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-auth-service:8180/actuator/health/readiness && ' +
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-gateway-service:8087/actuator/health/readiness && ' +
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-form-service:8086/actuator/health/readiness && ' +
+            'curl -f --connect-timeout 5 --max-time 10 http://circleguard-promotion-service:8088/actuator/health/readiness')
         }
       }
     }
@@ -405,14 +456,31 @@ def deployToEnv(String overlay, String namespace) {
                 export KUBECONFIG=\$KUBECONFIG_FILE
                 ${SERVICES.split().collect { svc -> "kubectl wait --for=condition=available deployment/circleguard-${svc} -n ${namespace} --timeout=60s" }.join("\n                ")}
             """
-        } catch (Exception e) {
-            echo "Deployment to ${overlay} failed: ${e.message}. Initiating rollback..."
-            // || true: non-fatal — rollback may not exist on a first-ever deployment
             sh """
                 export KUBECONFIG=\$KUBECONFIG_FILE
-                ${SERVICES.split().collect { svc -> "kubectl rollout undo deployment/circleguard-${svc} -n ${namespace} || true" }.join("\n                ")}
+                kubectl run readiness-check-${env.BUILD_NUMBER} \
+                  --rm --restart=Never \
+                  -n ${namespace} --image=curlimages/curl:8.5.0 --timeout=60s -- \
+                  sh -c 'curl -f --connect-timeout 5 --max-time 10 http://circleguard-auth-service:8180/actuator/health/readiness && curl -f --connect-timeout 5 --max-time 10 http://circleguard-gateway-service:8087/actuator/health/readiness && curl -f --connect-timeout 5 --max-time 10 http://circleguard-form-service:8086/actuator/health/readiness && curl -f --connect-timeout 5 --max-time 10 http://circleguard-promotion-service:8088/actuator/health/readiness'
             """
-            error "Deployment to ${overlay} failed and has been rolled back."
+        } catch (Exception e) {
+            echo "Deployment to ${overlay} failed: ${e.message}. Initiating rollback..."
+            sh """
+                export KUBECONFIG=\$KUBECONFIG_FILE
+                ROLLBACK_FAILED=0
+                for svc in ${SERVICES.split().join(' ')}; do
+                  echo "  [ROLLBACK] circleguard-\$svc in ${namespace}..."
+                  kubectl rollout undo deployment/circleguard-\$svc -n ${namespace} || true
+                  if kubectl rollout status deployment/circleguard-\$svc -n ${namespace} --timeout=120s; then
+                    echo "  [ROLLBACK OK] circleguard-\$svc stabilized."
+                  else
+                    echo "  [ROLLBACK FAIL] circleguard-\$svc did not stabilize — manual intervention required."
+                    ROLLBACK_FAILED=1
+                  fi
+                done
+                [ \$ROLLBACK_FAILED -eq 0 ] && echo "All services rolled back." || echo "WARNING: partial rollback failure detected."
+            """
+            error "Deployment to ${overlay} failed. Rollback attempted — see log for per-service results."
         }
     }
 }
