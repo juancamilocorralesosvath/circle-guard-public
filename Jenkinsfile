@@ -100,22 +100,20 @@ pipeline {
     stage('E2E Tests') {
       when { branch 'staging' }
       steps {
-        withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
-          sh '''
-            export KUBECONFIG=$KUBECONFIG_FILE
-            kubectl create configmap e2e-test-files \
-              --from-file=mobile/playwright.config.ts \
-              --from-file=mobile/e2e/tests/ \
-              -n circleguard-staging --dry-run=client -o yaml | kubectl apply -f -
-            kubectl delete job circleguard-e2e-tests -n circleguard-staging --ignore-not-found=true
-            kubectl apply -f mobile/e2e/playwright-k8s-job.yaml
-            kubectl wait --for=condition=complete job/circleguard-e2e-tests \
-              -n circleguard-staging --timeout=600s || true
-          '''
-        }
-      }
-      post {
-        always {
+        script {
+          withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
+            sh '''
+              export KUBECONFIG=$KUBECONFIG_FILE
+              kubectl create configmap e2e-test-files \
+                --from-file=mobile/playwright.config.ts \
+                --from-file=mobile/e2e/tests/ \
+                -n circleguard-staging --dry-run=client -o yaml | kubectl apply -f -
+              kubectl delete job circleguard-e2e-tests -n circleguard-staging --ignore-not-found=true
+              kubectl apply -f mobile/e2e/playwright-k8s-job.yaml
+              kubectl wait --for=condition=complete job/circleguard-e2e-tests \
+                -n circleguard-staging --timeout=600s || true
+            '''
+          }
           withCredentials([file(credentialsId: 'kubeconfig-juanc0410', variable: 'KUBECONFIG_FILE')]) {
             sh '''
               export KUBECONFIG=$KUBECONFIG_FILE
@@ -130,19 +128,19 @@ pipeline {
               kubectl delete job circleguard-e2e-tests -n circleguard-staging --ignore-not-found=true || true
             '''
           }
-          script {
-            def results = junit(allowEmptyResults: true, testResults: 'mobile/test-results/e2e-results.xml')
-            def total   = results.totalCount
-            def failed  = results.failCount
-            def skipped = results.skipCount
-            def passed  = total - failed - skipped
-            def rate    = (total > 0) ? (passed * 100.0 / total) : 0.0
-            echo "E2E: ${passed}/${total} passed (${String.format('%.1f', rate)}%)"
-            if (rate < 60.0) {
-              error "E2E success rate ${String.format('%.1f', rate)}% is below the 60% threshold."
-            } else if (rate < 100.0) {
-              unstable "E2E tests partially successful: ${String.format('%.1f', rate)}% passed."
-            }
+          def results = junit(allowEmptyResults: true, testResults: 'mobile/test-results/e2e-results.xml')
+          def total   = results.totalCount
+          def failed  = results.failCount
+          def skipped = results.skipCount
+          def passed  = total - failed - skipped
+          def rate    = (total > 0) ? (passed * 100.0 / total) : 0.0
+          echo "E2E: ${passed}/${total} passed (${String.format('%.1f', rate)}%)"
+          if (total == 0) {
+            unstable 'E2E: no JUnit cases parsed (missing job, logs, or ===JUNIT=== marker).'
+          } else if (rate < 60.0) {
+            error "E2E success rate ${String.format('%.1f', rate)}% is below the 60% threshold."
+          } else if (rate < 100.0) {
+            unstable "E2E tests partially successful: ${String.format('%.1f', rate)}% passed."
           }
         }
       }

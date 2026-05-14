@@ -479,8 +479,6 @@ Las pruebas End-to-End se ejecutan con **Playwright** desde un Kubernetes Job en
 - Submit sin `anonymousId` retorna HTTP 400 (validación de entrada).
 - El flujo `create + activate questionnaire` funciona correctamente para administradores.
 
-[IMAGEN: Reporte de Playwright en el Kubernetes Job mostrando los 5 specs ejecutados con sus tests internos (pass/fail)]
-
 ### 3.4 Pruebas de Rendimiento y Estrés
 
 Las pruebas de carga se ejecutaron con **Locust** en tres niveles de concurrencia, configuradas como Kubernetes Jobs en el namespace `circleguard-staging`. Se analizaron tres tiers:
@@ -561,7 +559,7 @@ La degradación exponencial del login bajo concurrencia apunta a un **cuello de 
 
 
 
-[IMAGEN: Locust CSV o tabla de resultados del tier stress]
+![locust stress](screenshots_informe/locuststress.png)
 
 ---
 
@@ -676,9 +674,6 @@ stage('Performance Tests') {
 
 La configuración de Locust para el tier peak (100 usuarios, 5 minutos, spawn rate 10 usuarios/segundo) se especifica directamente en el manifiesto `locust-k8s-job.yaml`. El tier stress utiliza `locust-k8s-stress-job.yaml` con 200 usuarios. Ambos stages usan `|| true` en el `kubectl wait`, permitiendo que el pipeline recopile los artefactos de resultados incluso cuando Locust detecta violaciones de SLA.
 
-[IMAGEN: Pipeline de staging completo en Jenkins con todos los stages en verde (o el estado real de la última ejecución)]
-
-[IMAGEN: Locust HTML Report publicado en Jenkins (Peak Load Report) mostrando gráficos de latencia y throughput]
 
 ---
 
@@ -806,9 +801,6 @@ def deployToEnv(String overlay, String namespace) {
 }
 ```
 
-[IMAGEN: Pipeline de producción completo en Jenkins mostrando todos los stages en verde, incluyendo Generate Release Notes y Deploy to Production]
-
-[IMAGEN: `kubectl get pods -n circleguard-prod` mostrando todos los pods en Running 1/1]
 
 ---
 
