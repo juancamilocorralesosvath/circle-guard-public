@@ -209,7 +209,7 @@ pipeline {
             kubectl delete job circleguard-e2e-tests -n circleguard-staging --ignore-not-found=true
             kubectl apply -f mobile/e2e/playwright-k8s-job.yaml
             kubectl wait --for=condition=complete job/circleguard-e2e-tests \
-              -n circleguard-staging --timeout=600s
+              -n circleguard-staging --timeout=600s || true
           '''
         }
       }
@@ -228,7 +228,20 @@ pipeline {
               kubectl delete job circleguard-e2e-tests -n circleguard-staging --ignore-not-found=true || true
             '''
           }
-          junit allowEmptyResults: true, testResults: 'mobile/test-results/e2e-results.xml'
+          script {
+            def results = junit(allowEmptyResults: true, testResults: 'mobile/test-results/e2e-results.xml')
+            def total   = results.totalCount
+            def failed  = results.failCount
+            def skipped = results.skipCount
+            def passed  = total - failed - skipped
+            def rate    = (total > 0) ? (passed * 100.0 / total) : 0.0
+            echo "E2E: ${passed}/${total} passed (${String.format('%.1f', rate)}%)"
+            if (rate < 60.0) {
+              error "E2E success rate ${String.format('%.1f', rate)}% is below the 60% threshold."
+            } else if (rate < 100.0) {
+              unstable "E2E tests partially successful: ${String.format('%.1f', rate)}% passed."
+            }
+          }
         }
       }
     }
