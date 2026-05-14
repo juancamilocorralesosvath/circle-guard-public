@@ -43,7 +43,7 @@ public class HealthStatusService {
         if ("ACTIVE".equals(status) && !adminOverride) {
             checkFenceWindow(anonymousId);
         }
-        
+
         var settings = systemSettingsRepository.getSettings()
                 .orElse(com.circleguard.promotion.model.jpa.SystemSettings.builder()
                         .encounterWindowDays(14)
@@ -51,14 +51,26 @@ public class HealthStatusService {
                         .unconfirmedFencingEnabled(true)
                         .autoThresholdSeconds(3600L)
                         .build());
-        
+
         long threshold = System.currentTimeMillis() - ((long)settings.getEncounterWindowDays() * 24 * 60 * 60 * 1000);
 
-        // Robust Multi-Tier High-Confidence Propagation Cypher - Augmented with isValid checks and timing
-        String unifiedQuery = 
+        // Step 1: Always MERGE source user and persist status — this MUST succeed regardless of contacts.
+        // Kept separate so Redis/Kafka always fire even when the user has no graph neighbors
+        // (Cypher collect() over zero rows produces zero rows, not an empty-list row).
+        neo4jClient.query(
+                "MERGE (source:User {anonymousId: $id}) " +
+                "SET source.status = $status, source.statusUpdatedAt = timestamp()")
+                .bind(anonymousId).to("id")
+                .bind(status).to("status")
+                .run();
+
+        // Always write source status to Redis
+        Map<String, String> cacheUpdates = new HashMap<>();
+        cacheUpdates.put(STATUS_KEY_PREFIX + anonymousId, status);
+
+        // Step 2: Contact propagation — optional, may return no rows when user has no contacts
+        String propagationQuery =
             "MATCH (source:User {anonymousId: $id}) " +
-            "SET source.status = $status, source.statusUpdatedAt = timestamp() " +
-            "WITH source " +
             "OPTIONAL MATCH (source)-[r1]-(c1:User) " +
             "WHERE ( " +
             "  (type(r1)='ENCOUNTERED' AND coalesce(r1.isValid, true) AND r1.startTime > $threshold) OR " +
@@ -84,56 +96,52 @@ public class HealthStatusService {
             "  ) " +
             "  AND c2.status = 'ACTIVE' AND c2.anonymousId <> source.anonymousId " +
             "SET c2.status = 'PROBABLE' " +
-            "WITH source, l1, collect(DISTINCT {id: c2.anonymousId, status: 'PROBABLE'}) as l2 " +
-            "RETURN source.anonymousId as sourceId, [x in (l1 + l2) WHERE x.id IS NOT NULL] as affectedContacts";
+            "WITH l1, collect(DISTINCT {id: c2.anonymousId, status: 'PROBABLE'}) as l2 " +
+            "RETURN [x in (l1 + l2) WHERE x.id IS NOT NULL] as affectedContacts";
 
-        var result = neo4jClient.query(unifiedQuery)
+        var propagationResult = neo4jClient.query(propagationQuery)
                 .bind(anonymousId).to("id")
                 .bind(status).to("status")
                 .bind(threshold).to("threshold")
                 .fetch().one();
 
-        if (result.isPresent()) {
-            Map<String, String> cacheUpdates = new HashMap<>();
-            cacheUpdates.put(STATUS_KEY_PREFIX + anonymousId, status);
-            
+        int affectedCount = 0;
+        if (propagationResult.isPresent()) {
             @SuppressWarnings("unchecked")
-            List<Map<String, String>> affected = (List<Map<String, String>>) result.get().get("affectedContacts");
+            List<Map<String, String>> affected = (List<Map<String, String>>) propagationResult.get().get("affectedContacts");
             if (affected != null) {
+                affectedCount = affected.size();
                 affected.forEach(m -> {
                     if (m != null && m.get("id") != null) {
                         cacheUpdates.put(STATUS_KEY_PREFIX + m.get("id"), m.get("status"));
                     }
                 });
             }
+        }
 
-            log.info("Batch updating {} Redis entries based on consolidated propagation", cacheUpdates.size());
-            updateRedisInBatches(cacheUpdates);
+        log.info("Batch updating {} Redis entries based on consolidated propagation", cacheUpdates.size());
+        updateRedisInBatches(cacheUpdates);
 
-            // Broadcast change
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("anonymousId", anonymousId);
-            payload.put("status", status);
-            payload.put("timestamp", System.currentTimeMillis());
+        // Broadcast change
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("anonymousId", anonymousId);
+        payload.put("status", status);
+        payload.put("timestamp", System.currentTimeMillis());
+        kafkaTemplate.send(TOPIC_STATUS_CHANGED, anonymousId, payload);
 
-            kafkaTemplate.send(TOPIC_STATUS_CHANGED, anonymousId, payload);
+        // Story 5.4: Automated Room Reservation Cancellation
+        checkAndBroadcastFencedCircles(anonymousId);
 
-            // Story 5.4: Automated Room Reservation Cancellation
-            checkAndBroadcastFencedCircles(anonymousId);
-
-            // Story 5.5: Administrative Alerting for Priority Roles
-            int affectedCount = (affected != null) ? affected.size() : 0;
-            if ("CONFIRMED".equals(status) || affectedCount > 20) {
-                log.info("Priority Alert triggered. Status: {}, Affected Count: {}", status, affectedCount);
-                Map<String, Object> priorityPayload = new HashMap<>();
-                priorityPayload.put("anonymousId", anonymousId);
-                priorityPayload.put("status", status);
-                priorityPayload.put("affectedCount", affectedCount);
-                priorityPayload.put("timestamp", System.currentTimeMillis());
-                priorityPayload.put("eventType", "CONFIRMED".equals(status) ? "CONFIRMED_CASE" : "LARGE_OUTBREAK");
-                
-                kafkaTemplate.send("alert.priority", anonymousId, priorityPayload);
-            }
+        // Story 5.5: Administrative Alerting for Priority Roles
+        if ("CONFIRMED".equals(status) || affectedCount > 20) {
+            log.info("Priority Alert triggered. Status: {}, Affected Count: {}", status, affectedCount);
+            Map<String, Object> priorityPayload = new HashMap<>();
+            priorityPayload.put("anonymousId", anonymousId);
+            priorityPayload.put("status", status);
+            priorityPayload.put("affectedCount", affectedCount);
+            priorityPayload.put("timestamp", System.currentTimeMillis());
+            priorityPayload.put("eventType", "CONFIRMED".equals(status) ? "CONFIRMED_CASE" : "LARGE_OUTBREAK");
+            kafkaTemplate.send("alert.priority", anonymousId, priorityPayload);
         }
     }
 

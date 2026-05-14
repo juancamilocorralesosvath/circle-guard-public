@@ -34,7 +34,7 @@ public class QrValidationService {
             // Check Redis for current Health Status
             String status = redisTemplate.opsForValue().get(STATUS_KEY_PREFIX + anonymousId);
             
-            if ("CONTAGIED".equals(status) || "POTENTIAL".equals(status)) {
+            if ("SUSPECT".equals(status) || "PROBABLE".equals(status) || "CONFIRMED".equals(status)) {
                 return new ValidationResult(false, "RED", "Access Denied: Health Risk Detected");
             }
 

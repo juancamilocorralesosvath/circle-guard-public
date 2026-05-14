@@ -28,9 +28,12 @@ public class HealthSurveyService {
     public HealthSurvey submitSurvey(HealthSurvey survey) {
         Optional<Questionnaire> activeQuestionnaire = questionnaireService.getActiveQuestionnaire();
         
-        boolean hasSymptoms = activeQuestionnaire
-                .map(q -> symptomMapper.hasSymptoms(survey, q))
-                .orElse(false);
+        boolean hasSymptoms;
+        if (activeQuestionnaire.isPresent() && survey.getResponses() != null && !survey.getResponses().isEmpty()) {
+            hasSymptoms = symptomMapper.hasSymptoms(survey, activeQuestionnaire.get());
+        } else {
+            hasSymptoms = Boolean.TRUE.equals(survey.getHasFever()) || Boolean.TRUE.equals(survey.getHasCough());
+        }
         
         // Compatibility: update the legacy fields if they are missing in request but present in responses
         if (survey.getHasFever() == null) survey.setHasFever(hasSymptoms);
