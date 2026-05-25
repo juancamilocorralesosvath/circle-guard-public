@@ -31,9 +31,13 @@
         {
           "expr": "rate(auth_token_issued_total[1m])",
           "legendFormat": "Tokens Issued"
+        },
+        {
+          "expr": "rate(auth_qr_generated_total[1m])",
+          "legendFormat": "QR Tokens Generated"
         }
       ],
-      "title": "Tokens Issued per Second",
+      "title": "Tokens & QR Issued per Second",
       "type": "timeseries"
     },
     {

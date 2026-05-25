@@ -10,6 +10,7 @@ public class AuthMetrics {
     private final Counter loginSuccess;
     private final Counter loginFailure;
     private final Counter tokenIssued;
+    private final Counter qrGenerated;
 
     public AuthMetrics(MeterRegistry registry) {
         this.loginSuccess = Counter.builder("auth.login.success")
@@ -23,6 +24,10 @@ public class AuthMetrics {
         this.tokenIssued = Counter.builder("auth.token.issued")
                 .description("Total JWT tokens issued")
                 .register(registry);
+
+        this.qrGenerated = Counter.builder("auth.qr.generated")
+                .description("Total QR tokens generated")
+                .register(registry);
     }
 
     public void recordLoginSuccess() {
@@ -35,5 +40,9 @@ public class AuthMetrics {
 
     public void recordTokenIssued() {
         tokenIssued.increment();
+    }
+
+    public void recordQrGenerated() {
+        qrGenerated.increment();
     }
 }

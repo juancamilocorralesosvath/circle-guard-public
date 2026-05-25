@@ -26,22 +26,22 @@ scrape_configs:
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ["demo-app:8080"]
-    labels:
-      application: demo-app
-      environment: dev
+        labels:
+          application: demo-app
+          environment: dev
 
   - job_name: auth-service
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ["host.docker.internal:8180"]
-    labels:
-      application: auth-service
-      environment: dev
+        labels:
+          application: auth-service
+          environment: dev
 
   - job_name: gateway-service
     metrics_path: /actuator/prometheus
     static_configs:
       - targets: ["host.docker.internal:8087"]
-    labels:
-      application: gateway-service
-      environment: dev
+        labels:
+          application: gateway-service
+          environment: dev

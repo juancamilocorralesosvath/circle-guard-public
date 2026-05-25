@@ -1,5 +1,6 @@
 package com.circleguard.auth.controller;
 
+import com.circleguard.auth.metrics.AuthMetrics;
 import com.circleguard.auth.service.QrTokenService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -12,18 +13,16 @@ import java.util.Map;
 @RequestMapping("/api/v1/auth/qr")
 @RequiredArgsConstructor
 public class QrTokenController {
-    private final QrTokenService qrService;
 
-    /**
-     * Generates a short-lived QR token for campus entry.
-     * The UID is extracted from the JWT authentication context.
-     */
+    private final QrTokenService qrService;
+    private final AuthMetrics authMetrics;
+
     @GetMapping("/generate")
     public ResponseEntity<Map<String, String>> generateToken(Authentication auth) {
-        // In a real app, the anonymousId is stored in the JWT principal/claims
         UUID anonymousId = UUID.fromString(auth.getName());
         String token = qrService.generateQrToken(anonymousId);
-        
+        authMetrics.recordQrGenerated();
+
         return ResponseEntity.ok(Map.of(
             "qrToken", token,
             "expiresIn", "60"
