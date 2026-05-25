@@ -1,0 +1,125 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "panels": [
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "rate(gateway_qr_validated_total[1m])",
+          "legendFormat": "QR Validated"
+        },
+        {
+          "expr": "rate(gateway_qr_rejected_total[1m])",
+          "legendFormat": "QR Rejected"
+        }
+      ],
+      "title": "QR Validation Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "rate(gateway_request_total[1m])",
+          "legendFormat": "Total Requests"
+        }
+      ],
+      "title": "Total Requests per Second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(http_server_requests_seconds_bucket{job=\"gateway-service\"}[5m]))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket{job=\"gateway-service\"}[5m]))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(http_server_requests_seconds_bucket{job=\"gateway-service\"}[5m]))",
+          "legendFormat": "p99"
+        }
+      ],
+      "title": "Gateway Request Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "rate(http_server_requests_seconds_count{job=\"gateway-service\",status=~\"5..\"}[5m])",
+          "legendFormat": "5xx"
+        },
+        {
+          "expr": "rate(http_server_requests_seconds_count{job=\"gateway-service\",status=~\"4..\"}[5m])",
+          "legendFormat": "4xx"
+        }
+      ],
+      "title": "Gateway Error Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "jvm_memory_used_bytes{area=\"heap\",job=\"gateway-service\"}",
+          "legendFormat": "Heap Used"
+        },
+        {
+          "expr": "jvm_memory_max_bytes{area=\"heap\",job=\"gateway-service\"}",
+          "legendFormat": "Heap Max"
+        }
+      ],
+      "title": "Gateway JVM Heap",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+      "id": 6,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "showTime": true,
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "expr": "{service=\"gateway-service\"}",
+          "legendFormat": ""
+        }
+      ],
+      "title": "Gateway Service Logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 38,
+  "tags": ["gateway", "circleguard"],
+  "time": { "from": "now-30m", "to": "now" },
+  "timezone": "browser",
+  "title": "Gateway Service — Overview",
+  "uid": "gateway-service-overview",
+  "version": 1
+}

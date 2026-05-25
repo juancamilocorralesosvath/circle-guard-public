@@ -1,0 +1,68 @@
+// Grafana Alloy configuration — collect Docker container logs and forward to Loki
+
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+// Discover all running Docker containers
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+  refresh_interval = "5s"
+}
+
+// Relabel Docker metadata into useful log labels
+discovery.relabel "docker_logs" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "project"
+  }
+
+  rule {
+    replacement  = "dev"
+    target_label = "environment"
+  }
+}
+
+// Collect logs from Docker containers
+loki.source.docker "docker_logs" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.relabel.docker_logs.output
+  forward_to    = [loki.process.extract_level.receiver]
+  refresh_interval = "5s"
+}
+
+// Extract log level from log lines
+loki.process "extract_level" {
+  forward_to = [loki.write.loki.receiver]
+
+  stage.regex {
+    expression = "(?i)(?P<level>(TRACE|DEBUG|INFO|WARN|ERROR|FATAL))"
+  }
+
+  stage.labels {
+    values = {
+      level = "level",
+    }
+  }
+}
+
+// Write logs to Loki
+loki.write "loki" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

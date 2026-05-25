@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: demo-observability
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    tags:
+      application: demo-app
+      environment: dev

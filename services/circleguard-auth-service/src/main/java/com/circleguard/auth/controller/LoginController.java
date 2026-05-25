@@ -1,5 +1,6 @@
 package com.circleguard.auth.controller;
 
+import com.circleguard.auth.metrics.AuthMetrics;
 import com.circleguard.auth.service.JwtTokenService;
 import com.circleguard.auth.client.IdentityClient;
 import lombok.RequiredArgsConstructor;
@@ -17,27 +18,28 @@ public class LoginController {
     private final AuthenticationManager authManager;
     private final JwtTokenService jwtService;
     private final IdentityClient identityClient;
+    private final AuthMetrics authMetrics;
 
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(@RequestBody Map<String, String> request) {
         String username = request.get("username");
         String password = request.get("password");
-        
+
         System.out.println("Login attempt for user: " + username + " (pass length: " + (password != null ? password.length() : 0) + ")");
 
         try {
-            // 1. Authenticate (Dual-Chain)
             Authentication auth = authManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, password)
             );
             System.out.println("Authentication successful for: " + username);
 
-            // 2. Anonymize (Fetch/Create Anonymous ID from Identity Service)
             UUID anonymousId = identityClient.getAnonymousId(username);
             System.out.println("Anonymous ID retrieved: " + anonymousId);
 
-            // 3. Issue Token
             String token = jwtService.generateToken(anonymousId, auth);
+
+            authMetrics.recordLoginSuccess();
+            authMetrics.recordTokenIssued();
 
             return ResponseEntity.ok(Map.of(
                     "token", token,
@@ -46,6 +48,7 @@ public class LoginController {
             ));
         } catch (org.springframework.security.core.AuthenticationException e) {
             System.err.println("Authentication failed for " + username + ": " + e.getMessage());
+            authMetrics.recordLoginFailure();
             return ResponseEntity.status(401).body(Map.of("message", "Invalid username or password"));
         } catch (Exception e) {
             System.err.println("Unexpected error during login for " + username + ":");
@@ -60,18 +63,18 @@ public class LoginController {
         if (anonymousIdStr == null) {
             return ResponseEntity.badRequest().build();
         }
-        
+
         UUID anonymousId = UUID.fromString(anonymousIdStr);
-        
-        // Create a dummy authentication for the visitor
+
         Authentication visitorAuth = new UsernamePasswordAuthenticationToken(
-                anonymousIdStr, 
-                null, 
+                anonymousIdStr,
+                null,
                 List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("VISITOR"))
         );
-        
+
         String token = jwtService.generateToken(anonymousId, visitorAuth);
-        
+        authMetrics.recordTokenIssued();
+
         return ResponseEntity.ok(Map.of(
                 "token", token,
                 "handoffPayload", "HANDOFF_TOKEN:" + anonymousId.toString() + ":" + token

@@ -1,0 +1,94 @@
+groups:
+  - name: service_health
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} on {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: HighErrorRate
+        expr: |
+          rate(http_server_requests_seconds_count{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP error rate on {{ $labels.job }}"
+          description: "{{ $labels.job }} is returning 5xx errors at {{ $value }} req/s."
+
+  - name: jvm_health
+    interval: 60s
+    rules:
+      - alert: JvmHighHeapUsage
+        expr: |
+          jvm_memory_used_bytes{area="heap"} / jvm_memory_max_bytes{area="heap"} > 0.8
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High JVM heap usage on {{ $labels.job }}"
+          description: "{{ $labels.job }} heap usage is above 80% for 3 minutes."
+
+      - alert: JvmGcHighPause
+        expr: |
+          rate(jvm_gc_pause_seconds_sum[5m]) / rate(jvm_gc_pause_seconds_count[5m]) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GC pause on {{ $labels.job }}"
+          description: "Average GC pause is {{ $value }}s on {{ $labels.job }}."
+
+  - name: node_health
+    interval: 60s
+    rules:
+      - alert: HighCpuUsage
+        expr: |
+          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 85% for 5 minutes."
+
+      - alert: HighMemoryUsage
+        expr: |
+          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 90% for 5 minutes."
+
+  - name: auth_service
+    interval: 30s
+    rules:
+      - alert: AuthHighFailureRate
+        expr: |
+          rate(auth_login_failure_total[5m]) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Excessive login failures on auth-service"
+          description: "Login failures at {{ $value }} req/s — possible brute force."
+
+  - name: gateway_service
+    interval: 30s
+    rules:
+      - alert: GatewayHighLatency
+        expr: |
+          histogram_quantile(0.95, rate(http_server_requests_seconds_bucket{job="gateway-service"}[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway p95 latency high"
+          description: "95th percentile latency is {{ $value }}s on gateway-service."
