@@ -6,6 +6,16 @@ namespace: circleguard-dev
 resources:
   - ../../base
 
+patches:
+  - path: patches/auth-service-nodeport.yaml
+    target:
+      kind: Service
+      name: circleguard-auth-service
+  - path: patches/gateway-service-nodeport.yaml
+    target:
+      kind: Service
+      name: circleguard-gateway-service
+
 images:
   - name: circleguard-auth-service
     newName: docker.io/juanc0410/circleguard-auth-service
