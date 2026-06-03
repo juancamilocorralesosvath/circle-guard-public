@@ -21,7 +21,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics
+        include: health,info,prometheus,metrics,circuitbreakers
   endpoint:
     health:
       probes:
@@ -31,3 +31,15 @@ management:
     tags:
       application: gateway-service
       environment: dev
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      redis:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
