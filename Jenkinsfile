@@ -48,6 +48,22 @@ pipeline {
       }
     }
 
+    stage('SonarQube Analysis') {
+      steps {
+        withSonarQubeEnv('sonarqube') {
+          sh './gradlew sonarqube --no-daemon'
+        }
+      }
+    }
+
+    stage('Quality Gate') {
+      steps {
+        timeout(time: 5, unit: 'MINUTES') {
+          waitForQualityGate abortPipeline: true
+        }
+      }
+    }
+
     stage('Docker Build & Push') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_HUB_USER', passwordVariable: 'DOCKER_HUB_PASS')]) {
@@ -70,6 +86,16 @@ pipeline {
                 docker push ${image}:latest
               """
             }
+          }
+        }
+      }
+    }
+
+    stage('Container Scan') {
+      steps {
+        script {
+          SERVICES.split().each { svc ->
+            sh "trivy image --exit-code 0 --severity HIGH,CRITICAL --no-progress ${DOCKER_REGISTRY}/${DOCKER_USER}/circleguard-${svc}:${GIT_COMMIT_SHORT}"
           }
         }
       }
