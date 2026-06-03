@@ -10,6 +10,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import org.springframework.data.redis.RedisConnectionFailureException;
+
 import java.security.Key;
 import java.util.UUID;
 
@@ -47,6 +49,19 @@ public class QrValidationServiceTest {
         
         assertTrue(result.valid());
         assertEquals("GREEN", result.status());
+    }
+
+    @Test
+    void fallback_whenRedisIsDown_grantsAccess() {
+        RedisConnectionFailureException redisDown =
+                new RedisConnectionFailureException("Redis unavailable");
+
+        QrValidationService.ValidationResult result =
+                service.fallbackValidateToken("any-token", redisDown);
+
+        assertTrue(result.valid());
+        assertEquals("UNKNOWN", result.status());
+        assertTrue(result.message().contains("temporarily unavailable"));
     }
 
     @Test

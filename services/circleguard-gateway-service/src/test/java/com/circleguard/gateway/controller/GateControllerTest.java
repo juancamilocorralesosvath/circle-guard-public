@@ -1,5 +1,6 @@
 package com.circleguard.gateway.controller;
 
+import com.circleguard.gateway.metrics.GatewayMetrics;
 import com.circleguard.gateway.service.QrValidationService;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -20,6 +21,9 @@ public class GateControllerTest {
 
     @MockBean
     private QrValidationService validationService;
+
+    @MockBean
+    private GatewayMetrics gatewayMetrics;
 
     @Test
     void shouldReturnValidationResult() throws Exception {
