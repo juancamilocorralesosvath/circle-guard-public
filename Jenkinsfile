@@ -434,7 +434,18 @@ pipeline {
 
   post {
     failure {
-      echo 'Pipeline failed - check logs and consider running rollback steps from CI_CD_RUNBOOK.md'
+      slackSend(
+        channel: '#ci-alerts',
+        color: 'danger',
+        message: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)\nBranch: ${env.BRANCH_NAME ?: 'unknown'} | Commit: ${env.GIT_COMMIT_SHORT}"
+      )
+    }
+    success {
+      slackSend(
+        channel: '#ci-alerts',
+        color: 'good',
+        message: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)\nBranch: ${env.BRANCH_NAME ?: 'unknown'} | Commit: ${env.GIT_COMMIT_SHORT}"
+      )
     }
   }
 }
