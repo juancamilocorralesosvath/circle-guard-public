@@ -25,4 +25,8 @@ RUN KUSTOMIZE_VER=v5.1.0 \
   && curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VER}/kustomize_${KUSTOMIZE_VER}_linux_${KUSTOMIZE_ARCH}.tar.gz" | tar xz \
   && install -o root -g root -m 0755 kustomize /usr/local/bin/kustomize \
   && rm kustomize
+
+# Install Trivy
+RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+    | sh -s -- -b /usr/local/bin v0.51.4
 USER jenkins
