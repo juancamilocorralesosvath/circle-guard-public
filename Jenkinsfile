@@ -20,7 +20,7 @@ pipeline {
 
     stage('Build & Test') {
       steps {
-        sh './gradlew build --continue --parallel --build-cache --no-daemon'
+        sh './gradlew build jacocoTestReport --continue --parallel --build-cache --no-daemon'
         junit allowEmptyResults: true, testResults: '**/build/test-results/**/*.xml'
         archiveArtifacts artifacts: 'services/**/build/libs/*.jar', fingerprint: true, allowEmptyArchive: true
       }
@@ -44,6 +44,26 @@ pipeline {
           publishHTML(target: [allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'services/circleguard-promotion-service/build/reports/tests/test',
             reportFiles: 'index.html', reportName: 'Promotion Service Test Report'])
+          publishHTML(target: [allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'services/circleguard-auth-service/build/reports/jacoco/test/html',
+            reportFiles: 'index.html', reportName: 'Auth Service Coverage Report'])
+          publishHTML(target: [allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'services/circleguard-form-service/build/reports/jacoco/test/html',
+            reportFiles: 'index.html', reportName: 'Form Service Coverage Report'])
+          publishHTML(target: [allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'services/circleguard-gateway-service/build/reports/jacoco/test/html',
+            reportFiles: 'index.html', reportName: 'Gateway Service Coverage Report'])
+          publishHTML(target: [allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'services/circleguard-identity-service/build/reports/jacoco/test/html',
+            reportFiles: 'index.html', reportName: 'Identity Service Coverage Report'])
+          publishHTML(target: [allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'services/circleguard-notification-service/build/reports/jacoco/test/html',
+            reportFiles: 'index.html', reportName: 'Notification Service Coverage Report'])
+          publishHTML(target: [allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'services/circleguard-promotion-service/build/reports/jacoco/test/html',
+            reportFiles: 'index.html', reportName: 'Promotion Service Coverage Report'])
+          archiveArtifacts artifacts: 'services/**/build/reports/jacoco/test/jacocoTestReport.xml',
+            fingerprint: true, allowEmptyArchive: true
         }
       }
     }
@@ -267,6 +287,26 @@ pipeline {
             reportFiles: 'report.html',
             reportName: 'Locust Stress Report'
           ])
+        }
+      }
+    }
+
+    stage('Security Scan (ZAP)') {
+      when { branch 'staging' }
+      steps {
+        sh 'bash performance/zap-scan.sh'
+      }
+      post {
+        always {
+          publishHTML(target: [
+            allowMissing: true,
+            alwaysLinkToLastBuild: true,
+            keepAll: true,
+            reportDir: 'zap-reports',
+            reportFiles: 'zap-report.html',
+            reportName: 'ZAP Security Report'
+          ])
+          archiveArtifacts artifacts: 'zap-reports/zap-report.html', allowEmptyArchive: true
         }
       }
     }

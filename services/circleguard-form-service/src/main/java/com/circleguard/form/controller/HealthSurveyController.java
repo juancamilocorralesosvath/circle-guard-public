@@ -1,5 +1,6 @@
 package com.circleguard.form.controller;
 
+import com.circleguard.form.metrics.FormMetrics;
 import com.circleguard.form.model.HealthSurvey;
 import com.circleguard.form.service.HealthSurveyService;
 import lombok.RequiredArgsConstructor;
@@ -12,12 +13,15 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class HealthSurveyController {
     private final HealthSurveyService surveyService;
+    private final FormMetrics formMetrics;
 
     @PostMapping
     public ResponseEntity<HealthSurvey> submit(@RequestBody HealthSurvey survey) {
         if (survey == null || survey.getAnonymousId() == null) {
             throw new IllegalArgumentException("anonymousId is required");
         }
-        return ResponseEntity.ok(surveyService.submitSurvey(survey));
+        HealthSurvey saved = surveyService.submitSurvey(survey);
+        formMetrics.recordSurveySubmitted();
+        return ResponseEntity.ok(saved);
     }
 }

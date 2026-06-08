@@ -53,6 +53,7 @@ module "configmap" {
     LDAP_BASE                                            = "dc=circleguard,dc=edu"
     AUTH_API_URL                                         = "http://circleguard-auth-service:8180"
     IDENTITY_SERVICE_URL                                 = "http://circleguard-identity-service:8083"
+    OTEL_EXPORTER_OTLP_ENDPOINT                          = "http://host.docker.internal:4317"
     JWT_EXPIRATION                                       = "3600000"
     QR_EXPIRATION                                        = "300000"
     SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE           = "25"

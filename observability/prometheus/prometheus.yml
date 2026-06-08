@@ -45,3 +45,35 @@ scrape_configs:
         labels:
           application: gateway-service
           environment: dev
+
+  - job_name: identity-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:30083"]
+        labels:
+          application: identity-service
+          environment: dev
+
+  - job_name: form-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:30086"]
+        labels:
+          application: form-service
+          environment: dev
+
+  - job_name: notification-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:30082"]
+        labels:
+          application: notification-service
+          environment: dev
+
+  - job_name: promotion-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:30088"]
+        labels:
+          application: promotion-service
+          environment: dev

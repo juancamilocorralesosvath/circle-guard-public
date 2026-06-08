@@ -15,6 +15,22 @@ patches:
     target:
       kind: Service
       name: circleguard-gateway-service
+  - path: patches/identity-service-nodeport.yaml
+    target:
+      kind: Service
+      name: circleguard-identity-service
+  - path: patches/form-service-nodeport.yaml
+    target:
+      kind: Service
+      name: circleguard-form-service
+  - path: patches/notification-service-nodeport.yaml
+    target:
+      kind: Service
+      name: circleguard-notification-service
+  - path: patches/promotion-service-nodeport.yaml
+    target:
+      kind: Service
+      name: circleguard-promotion-service
 
 images:
   - name: circleguard-auth-service

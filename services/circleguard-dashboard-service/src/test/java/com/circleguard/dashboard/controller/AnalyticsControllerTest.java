@@ -55,4 +55,35 @@ class AnalyticsControllerTest {
                 .andExpect(jsonPath("$[0].hour").value("08:00"))
                 .andExpect(jsonPath("$[0].count").value(120));
     }
+
+    @Test
+    void shouldReturnCampusSummary() throws Exception {
+        Mockito.when(analyticsService.getCampusSummary()).thenReturn(Map.of("activeCount", 12));
+
+        mockMvc.perform(get("/api/v1/analytics/summary").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeCount").value(12));
+    }
+
+    @Test
+    void shouldReturnDepartmentStats() throws Exception {
+        Mockito.when(analyticsService.getDepartmentStats("engineering"))
+                .thenReturn(Map.of("department", "engineering", "totalUsers", 20));
+
+        mockMvc.perform(get("/api/v1/analytics/department/engineering").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.department").value("engineering"))
+                .andExpect(jsonPath("$.totalUsers").value(20));
+    }
+
+    @Test
+    void shouldReturnTimeSeriesWithDefaultParameters() throws Exception {
+        Mockito.when(analyticsService.getTimeSeries("hourly", 24))
+                .thenReturn(List.of(Map.of("status", "ACTIVE", "total", 200)));
+
+        mockMvc.perform(get("/api/v1/analytics/time-series").accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$[0].total").value(200));
+    }
 }

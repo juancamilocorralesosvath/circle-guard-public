@@ -80,4 +80,51 @@ public class QrValidationServiceTest {
         assertFalse(result.valid());
         assertEquals("RED", result.status());
     }
+
+    @Test
+    void shouldDenyAccessForProbableUser() {
+        QrValidationService.ValidationResult result = validateWithHealthStatus("PROBABLE");
+
+        assertFalse(result.valid());
+        assertEquals("RED", result.status());
+        assertEquals("Access Denied: Health Risk Detected", result.message());
+    }
+
+    @Test
+    void shouldDenyAccessForConfirmedUser() {
+        QrValidationService.ValidationResult result = validateWithHealthStatus("CONFIRMED");
+
+        assertFalse(result.valid());
+        assertEquals("RED", result.status());
+    }
+
+    @Test
+    void shouldAllowAccessWhenNoStatusExists() {
+        QrValidationService.ValidationResult result = validateWithHealthStatus(null);
+
+        assertTrue(result.valid());
+        assertEquals("GREEN", result.status());
+        assertEquals("Welcome to Campus", result.message());
+    }
+
+    @Test
+    void shouldRejectInvalidToken() {
+        QrValidationService.ValidationResult result = service.validateToken("not-a-jwt");
+
+        assertFalse(result.valid());
+        assertEquals("RED", result.status());
+        assertEquals("Invalid or Expired Token", result.message());
+    }
+
+    private QrValidationService.ValidationResult validateWithHealthStatus(String status) {
+        String anonymousId = UUID.randomUUID().toString();
+        Key key = Keys.hmacShaKeyFor(secret.getBytes());
+        String token = Jwts.builder()
+                .setSubject(anonymousId)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+        Mockito.when(valueOps.get("user:status:" + anonymousId)).thenReturn(status);
+
+        return service.validateToken(token);
+    }
 }

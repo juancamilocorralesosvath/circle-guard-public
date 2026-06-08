@@ -32,6 +32,16 @@ management:
       application: gateway-service
       environment: dev
 
+otel:
+  service:
+    name: ${spring.application.name}
+  traces:
+    exporter: otlp
+  exporter:
+    otlp:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+      protocol: grpc
+
 resilience4j:
   circuitbreaker:
     instances:

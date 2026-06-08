@@ -39,5 +39,25 @@ public class GateControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.valid").value(true))
                 .andExpect(jsonPath("$.status").value("GREEN"));
+
+        Mockito.verify(gatewayMetrics).recordQrValidated();
+    }
+
+    @Test
+    void shouldRecordRejectedValidationResult() throws Exception {
+        String token = "mock-token";
+        QrValidationService.ValidationResult mockResult =
+            new QrValidationService.ValidationResult(false, "RED", "Invalid");
+
+        Mockito.when(validationService.validateToken(token)).thenReturn(mockResult);
+
+        mockMvc.perform(post("/api/v1/gate/validate")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\": \"mock-token\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(false))
+                .andExpect(jsonPath("$.status").value("RED"));
+
+        Mockito.verify(gatewayMetrics).recordQrRejected();
     }
 }

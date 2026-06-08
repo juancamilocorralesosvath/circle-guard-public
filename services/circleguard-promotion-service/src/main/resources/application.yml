@@ -52,8 +52,13 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus,metrics
   endpoint:
     health:
       probes:
         enabled: true
+      show-details: always
+  metrics:
+    tags:
+      application: promotion-service
+      environment: dev
