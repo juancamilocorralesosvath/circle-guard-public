@@ -27,6 +27,11 @@ RUN KUSTOMIZE_VER=v5.1.0 \
   && rm kustomize
 
 # Install Trivy
-RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-    | sh -s -- -b /usr/local/bin v0.51.4
+RUN ARCH="$(uname -m)" \
+  && if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then TRIVY_ARCH=Linux-ARM64; else TRIVY_ARCH=Linux-64bit; fi \
+  && TRIVY_VER=0.71.0 \
+  && curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VER}/trivy_${TRIVY_VER}_${TRIVY_ARCH}.tar.gz" -o /tmp/trivy.tar.gz \
+  && tar -xzf /tmp/trivy.tar.gz -C /tmp trivy \
+  && install -o root -g root -m 0755 /tmp/trivy /usr/local/bin/trivy \
+  && rm /tmp/trivy.tar.gz /tmp/trivy
 USER jenkins

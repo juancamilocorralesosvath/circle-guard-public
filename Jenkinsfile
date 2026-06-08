@@ -474,17 +474,17 @@ pipeline {
 
   post {
     failure {
-      slackSend(
-        channel: '#ci-alerts',
-        color: 'danger',
-        message: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)\nBranch: ${env.BRANCH_NAME ?: 'unknown'} | Commit: ${env.GIT_COMMIT_SHORT}"
+      mail(
+        to: 'correoalternativopersonal492@gmail.com',
+        subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        body: "Pipeline failed.\nBranch: ${env.BRANCH_NAME ?: 'unknown'} | Commit: ${env.GIT_COMMIT_SHORT}\nDetails: ${env.BUILD_URL}"
       )
     }
     success {
-      slackSend(
-        channel: '#ci-alerts',
-        color: 'good',
-        message: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER} (<${env.BUILD_URL}|Open>)\nBranch: ${env.BRANCH_NAME ?: 'unknown'} | Commit: ${env.GIT_COMMIT_SHORT}"
+      mail(
+        to: 'correoalternativopersonal492@gmail.com',
+        subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+        body: "Pipeline succeeded.\nBranch: ${env.BRANCH_NAME ?: 'unknown'} | Commit: ${env.GIT_COMMIT_SHORT}\nDetails: ${env.BUILD_URL}"
       )
     }
   }
