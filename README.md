@@ -161,4 +161,41 @@ We maintain high system integrity via multi-level testing:
 - **Right to be Forgotten**: Users can trigger complete data purging via the Identity Vault.
 - **Temporal Privacy**: All contact edges are automatically purged after 14 days.
 
+---
+
+## Quick Start
+
+```bash
+# 1. Start observability stack
+docker compose -f observability/docker-compose.yml up -d
+
+# 2. Deploy to dev namespace
+kubectl apply -k k8s/overlays/dev
+
+# 3. Verify services are up
+kubectl get pods -n circleguard-dev
+
+# 4. Open Jenkins and run the pipeline
+open http://localhost:32080
+```
+
+For full setup instructions see [docs/OPERATIONS.md](docs/OPERATIONS.md).
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture diagrams, service catalogue, dependencies |
+| [OPERATIONS.md](docs/OPERATIONS.md) | How to start, deploy, rollback, and monitor the system |
+| [TERRAFORM.md](docs/TERRAFORM.md) | Infrastructure as Code: modules, environments, cost estimate |
+| [DESIGN_PATTERNS.md](docs/DESIGN_PATTERNS.md) | Patterns in use: API Gateway, Circuit Breaker, External Config |
+| [AGILE.md](docs/AGILE.md) | Kanban board, branching strategy, sprint planning |
+| [SECURITY.md](docs/SECURITY.md) | RBAC, secret management, TLS configuration |
+| [CI_CD_RUNBOOK.md](docs/CI_CD_RUNBOOK.md) | Pipeline recovery and rollback procedures |
+| [TEAMMATE_SETUP.md](docs/TEAMMATE_SETUP.md) | Onboarding guide for new contributors |
+
+---
+
 ## happy coding! :D
