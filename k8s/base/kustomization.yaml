@@ -6,6 +6,8 @@ resources:
   - configmaps/circleguard-config.yaml
   - configmaps/postgres-init-config.yaml
   - secrets/circleguard-secrets.yaml
+  # RBAC
+  - rbac/services-rbac.yaml
   # Middleware
   - postgres/postgres.yaml
   - neo4j/neo4j.yaml
@@ -20,3 +22,6 @@ resources:
   - services/promotion-service.yaml
   - services/gateway-service.yaml
   - services/notification-service.yaml
+  # TLS (requires cert-manager installed in cluster)
+  - cert-manager/cluster-issuer.yaml
+  - cert-manager/gateway-certificate.yaml

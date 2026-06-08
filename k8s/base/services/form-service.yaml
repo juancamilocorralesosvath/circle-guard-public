@@ -17,6 +17,7 @@ spec:
       labels:
         app: circleguard-form-service
     spec:
+      serviceAccountName: circleguard-service
       containers:
       - name: form-service
         image: circleguard-form-service:latest

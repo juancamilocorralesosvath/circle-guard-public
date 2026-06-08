@@ -17,6 +17,7 @@ spec:
       labels:
         app: circleguard-auth-service
     spec:
+      serviceAccountName: circleguard-service
       containers:
       - name: auth-service
         image: circleguard-auth-service:latest
