@@ -74,6 +74,8 @@ Each service exposes Spring Boot Actuator health endpoints:
 | promotion-service | http://localhost:30083/actuator/health |
 | form-service | http://localhost:30084/actuator/health |
 | notification-service | http://localhost:30085/actuator/health |
+| dashboard-service | http://localhost:30084/actuator/health |
+| file-service | http://localhost:30085/actuator/health |
 
 Circuit breaker state:
 ```bash

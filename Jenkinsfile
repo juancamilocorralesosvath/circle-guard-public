@@ -3,7 +3,7 @@ pipeline {
   environment {
     DOCKER_REGISTRY = 'docker.io'
     DOCKER_USER = 'juanc0410'
-    SERVICES = 'auth-service identity-service form-service promotion-service gateway-service notification-service'
+    SERVICES = 'auth-service identity-service form-service promotion-service gateway-service notification-service dashboard-service file-service'
   }
   options {
     ansiColor('xterm')

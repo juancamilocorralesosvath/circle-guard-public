@@ -81,8 +81,8 @@ Each namespace is provisioned by Terraform (`terraform/environments/`) with:
 | promotion-service | 8083 | 30083 | Recursive graph-based status propagation | Neo4j, Kafka |
 | form-service | 8084 | 30084 | Health questionnaire submission | PostgreSQL |
 | notification-service | 8085 | 30085 | Multi-channel notifications | Kafka |
-| dashboard-service | 8086 | — | Geospatial hotspot analytics | — |
-| file-service | 8088 | — | Secure document storage | — |
+| dashboard-service | 8084 | 30084 | Geospatial hotspot analytics | PostgreSQL |
+| file-service | 8085 | 30085 | Secure document storage | — (local filesystem) |
 
 ---
 

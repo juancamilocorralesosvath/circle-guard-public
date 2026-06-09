@@ -22,6 +22,8 @@ resources:
   - services/promotion-service.yaml
   - services/gateway-service.yaml
   - services/notification-service.yaml
+  - services/dashboard-service.yaml
+  - services/file-service.yaml
   # TLS (requires cert-manager installed in cluster)
   - cert-manager/cluster-issuer.yaml
   - cert-manager/gateway-certificate.yaml

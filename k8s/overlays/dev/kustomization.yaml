@@ -31,6 +31,14 @@ patches:
     target:
       kind: Service
       name: circleguard-promotion-service
+  - path: patches/dashboard-service-nodeport.yaml
+    target:
+      kind: Service
+      name: circleguard-dashboard-service
+  - path: patches/file-service-nodeport.yaml
+    target:
+      kind: Service
+      name: circleguard-file-service
 
 images:
   - name: circleguard-auth-service
@@ -50,4 +58,10 @@ images:
     newTag: latest
   - name: circleguard-notification-service
     newName: docker.io/juanc0410/circleguard-notification-service
+    newTag: latest
+  - name: circleguard-dashboard-service
+    newName: docker.io/juanc0410/circleguard-dashboard-service
+    newTag: latest
+  - name: circleguard-file-service
+    newName: docker.io/juanc0410/circleguard-file-service
     newTag: latest
