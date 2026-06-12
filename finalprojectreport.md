@@ -1,8 +1,9 @@
 # CircleGuard — Informe Final del Proyecto
 
 **Curso:** Ingeniería de Software V  
-**Repositorio:** `juancamilocorralesosvath/circle-guard-public`  
+**Repositorio:** `https://github.com/juancamilocorralesosvath/circle-guard-public.git`  
 **Fecha:** Junio 2026
+**Integrantes:** William Joseph Verdesoto y Juan Camilo Corrales Osvath 
 
 ---
 
