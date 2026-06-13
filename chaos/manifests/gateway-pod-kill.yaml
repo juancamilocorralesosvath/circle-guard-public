@@ -1,0 +1,16 @@
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: circleguard-gateway-pod-kill
+  namespace: circleguard-dev
+  labels:
+    app.kubernetes.io/part-of: circleguard
+    circleguard.io/bonus: chaos-engineering
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces:
+      - circleguard-dev
+    labelSelectors:
+      app: circleguard-gateway-service

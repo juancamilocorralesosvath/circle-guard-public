@@ -1,0 +1,11 @@
+{
+  "currency": "USD",
+  "hoursPerMonth": 730,
+  "cpuCoreHour": 0.034,
+  "memoryGiBHour": 0.004,
+  "storageGiBMonth": 0.10,
+  "notes": [
+    "Classroom estimate for Kubernetes requested capacity.",
+    "Docker Desktop local runtime has no cloud bill; this model approximates managed cloud compute."
+  ]
+}
