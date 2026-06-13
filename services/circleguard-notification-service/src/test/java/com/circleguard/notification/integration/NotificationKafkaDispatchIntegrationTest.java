@@ -6,8 +6,11 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.test.context.EmbeddedKafka;
+import org.springframework.kafka.test.utils.ContainerTestUtils;
 import org.springframework.mail.javamail.JavaMailSender;
 
 import java.util.Map;
@@ -48,7 +51,7 @@ import static org.mockito.Mockito.*;
 })
 @EmbeddedKafka(
         partitions = 1,
-        topics = {"promotion.status.changed"},
+        topics = {"promotion.status.changed", "circle.fenced", "alert.priority"},
         brokerProperties = {
             "auto.create.topics.enable=true",
             "group.initial.rebalance.delay.ms=0"
@@ -61,6 +64,9 @@ class NotificationKafkaDispatchIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private KafkaListenerEndpointRegistry kafkaListenerEndpointRegistry;
 
     @MockBean
     private EmailService emailService;
@@ -78,6 +84,7 @@ class NotificationKafkaDispatchIntegrationTest {
 
     @BeforeEach
     void resetMocks() {
+        waitForKafkaListeners();
         reset(emailService, smsService, pushService);
         // All channels respond with completed futures by default
         when(emailService.sendAsync(anyString(), anyString()))
@@ -88,6 +95,12 @@ class NotificationKafkaDispatchIntegrationTest {
                 .thenReturn(CompletableFuture.completedFuture(null));
         when(pushService.sendAsync(anyString(), anyString(), anyMap()))
                 .thenReturn(CompletableFuture.completedFuture(null));
+    }
+
+    private void waitForKafkaListeners() {
+        for (MessageListenerContainer container : kafkaListenerEndpointRegistry.getListenerContainers()) {
+            ContainerTestUtils.waitForAssignment(container, 1);
+        }
     }
 
     // ── Helper ───────────────────────────────────────────────────────────────

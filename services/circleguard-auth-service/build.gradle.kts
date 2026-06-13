@@ -27,7 +27,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("com.h2database:h2")
-    testImplementation("org.testcontainers:junit-jupiter:1.19.0")
-    testImplementation("org.testcontainers:postgresql:1.19.0")
+    testImplementation("org.testcontainers:junit-jupiter:1.21.4")
+    testImplementation("org.testcontainers:postgresql:1.21.4")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.11.0")
 }

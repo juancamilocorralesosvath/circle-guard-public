@@ -67,6 +67,15 @@ subprojects {
         useJUnitPlatform()
     }
 
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.testcontainers") {
+                useVersion("1.21.4")
+                because("Docker Engine 29 requires a Testcontainers/docker-java stack that supports API 1.44+")
+            }
+        }
+    }
+
     extensions.findByType<SourceSetContainer>()?.let { sourceSets ->
         val testTask = tasks.named<Test>("test")
 
